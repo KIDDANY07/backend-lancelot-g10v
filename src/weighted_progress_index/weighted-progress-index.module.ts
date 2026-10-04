@@ -35,5 +35,6 @@ import { WeightedProgressIndexService } from './weighted-progress-index.service'
   ],
   controllers: [WeightedProgressIndexController],
   providers: [WeightedProgressIndexService, ProgressIndexCalculatorService],
+  exports: [WeightedProgressIndexService, ProgressIndexCalculatorService],
 })
 export class WeightedProgressIndexModule {}

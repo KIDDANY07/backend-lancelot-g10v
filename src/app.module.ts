@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { ScheduleModule } from '@nestjs/schedule'
+import { EventEmitterModule } from '@nestjs/event-emitter'
 import { UsersModule } from './users/users.module'
 import { AuthModule } from './auth/auth.module'
 import { RolesModule } from './roles/roles.module'
@@ -28,6 +29,9 @@ import { WeightedProgressIndexModule } from './weighted_progress_index/weighted-
 import { TalentFlagsModule } from './talent_flags/talent-flags.module'
 import { ReportsModule } from './reports/reports.module'
 import { InjuryRiskRuleConfigModule } from './injury_risk_rule_config/injury-risk-rule-config.module'
+import { TalentRuleConfigModule } from './talent_rule_config/talent-rule-config.module'
+import { MlFeaturesModule } from './ml_features/ml-features.module'
+import { MlEngineModule } from './ml_engine/ml-engine.module'
 
 @Module({
   imports: [
@@ -35,6 +39,7 @@ import { InjuryRiskRuleConfigModule } from './injury_risk_rule_config/injury-ris
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -70,6 +75,9 @@ import { InjuryRiskRuleConfigModule } from './injury_risk_rule_config/injury-ris
     TalentFlagsModule,
     ReportsModule,
     InjuryRiskRuleConfigModule,
+    TalentRuleConfigModule,
+    MlFeaturesModule,
+    MlEngineModule,
   ],
   controllers: [],
   providers: [],

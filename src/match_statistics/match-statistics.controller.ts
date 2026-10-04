@@ -19,9 +19,15 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger'
+import { GetUser } from 'src/auth/decorators/get-user.decorator'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
+import {
+  assertOwnRecordOrStaff,
+  isDeportista,
+} from 'src/common/utils/ownership.util'
+import { User } from 'src/users/entities/user.entity'
 import { CreateMatchStatisticDto } from './dto/create-match-statistic.dto'
 import { FilterMatchStatisticDto } from './dto/filter-match-statistic.dto'
 import { ResponseMatchStatisticDto } from './dto/response-match-statistic.dto'
@@ -41,7 +47,8 @@ export class MatchStatisticsController {
   @Get()
   @ApiOperation({ summary: 'Listar estadísticas de partido' })
   @ApiQuery({ type: FilterMatchStatisticDto })
-  findAll(@Query() filters: FilterMatchStatisticDto) {
+  findAll(@Query() filters: FilterMatchStatisticDto, @GetUser() user: User) {
+    if (isDeportista(user)) filters.id_user = user.id_user
     return this.matchStatisticsService.findAll(filters)
   }
 
@@ -50,8 +57,13 @@ export class MatchStatisticsController {
   @ApiOperation({ summary: 'Consultar una estadística de partido por ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiOkResponse({ type: ResponseMatchStatisticDto })
-  getById(@Param('id', ParseIntPipe) id_match_stat: number) {
-    return this.matchStatisticsService.getById(id_match_stat)
+  async getById(
+    @Param('id', ParseIntPipe) id_match_stat: number,
+    @GetUser() user: User,
+  ) {
+    const result = await this.matchStatisticsService.getById(id_match_stat)
+    assertOwnRecordOrStaff(user, result.stat.id_user)
+    return result
   }
 
   @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')

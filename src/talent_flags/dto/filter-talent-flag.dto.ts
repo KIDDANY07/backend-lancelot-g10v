@@ -1,7 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator'
-import { TalentFlagStatus } from '../entities/talent-flag.entity'
+import {
+  TalentFlagSource,
+  TalentFlagStatus,
+} from '../entities/talent-flag.entity'
 
 export class FilterTalentFlagDto {
   @IsOptional()
@@ -37,4 +40,13 @@ export class FilterTalentFlagDto {
   @IsEnum(TalentFlagStatus)
   @ApiPropertyOptional({ enum: TalentFlagStatus })
   status?: TalentFlagStatus
+
+  @IsOptional()
+  @IsEnum(TalentFlagSource)
+  @ApiPropertyOptional({
+    enum: TalentFlagSource,
+    description:
+      'Origen de la señalización: manual, reglas automáticas o modelo de ML',
+  })
+  source?: TalentFlagSource
 }

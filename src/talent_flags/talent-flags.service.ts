@@ -12,7 +12,7 @@ import { CreateTalentFlagDto } from './dto/create-talent-flag.dto'
 import { FilterTalentFlagDto } from './dto/filter-talent-flag.dto'
 import { ResponseTalentFlagDto } from './dto/response-talent-flag.dto'
 import { UpdateTalentFlagDto } from './dto/update-talent-flag.dto'
-import { TalentFlag } from './entities/talent-flag.entity'
+import { TalentFlag, TalentFlagSource } from './entities/talent-flag.entity'
 
 @Injectable()
 export class TalentFlagsService {
@@ -58,7 +58,7 @@ export class TalentFlagsService {
   }
 
   async findAll(filters: FilterTalentFlagDto) {
-    const { page = 1, limit = 10, id_user, id_season, status } = filters
+    const { page = 1, limit = 10, id_user, id_season, status, source } = filters
     const query = this.talentFlagsRepository
       .createQueryBuilder('flag')
       .leftJoinAndSelect('flag.athlete', 'athlete')
@@ -67,9 +67,9 @@ export class TalentFlagsService {
       .take(limit)
 
     if (id_user) query.andWhere('flag.id_user = :id_user', { id_user })
-    if (id_season)
-      query.andWhere('flag.id_season = :id_season', { id_season })
+    if (id_season) query.andWhere('flag.id_season = :id_season', { id_season })
     if (status) query.andWhere('flag.status = :status', { status })
+    if (source) query.andWhere('flag.source = :source', { source })
 
     const [flags, total] = await query.getManyAndCount()
     if (!total)
@@ -109,11 +109,17 @@ export class TalentFlagsService {
       createTalentFlagDto.id_season,
       createTalentFlagDto.created_by,
     )
-    const flag = await this.talentFlagsRepository.save(createTalentFlagDto)
+    const flag = await this.talentFlagsRepository.save({
+      ...createTalentFlagDto,
+      source: TalentFlagSource.MANUAL,
+    })
     return this.getById(flag.id_flag)
   }
 
-  async updateStatus(id_flag: number, updateTalentFlagDto: UpdateTalentFlagDto) {
+  async updateStatus(
+    id_flag: number,
+    updateTalentFlagDto: UpdateTalentFlagDto,
+  ) {
     const flag = await this.findOneById(id_flag)
     if (!flag)
       throw new NotFoundException({

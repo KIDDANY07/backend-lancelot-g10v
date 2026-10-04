@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { FatigueAlertLevel } from './entities/fatigue-alert.entity'
 
+export type TrainingLoadSource = 'training' | 'match'
+
 export interface TrainingLoadRecord {
   date: string
   rpe: number
   duration_min: number
+  source?: TrainingLoadSource
 }
 
 export interface AcwrThresholdsInput {

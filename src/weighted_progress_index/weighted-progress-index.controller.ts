@@ -49,9 +49,21 @@ export class WeightedProgressIndexController {
     return this.weightedProgressIndexService.getById(id_index)
   }
 
+  @Post('recalculate-season/:id_season')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO')
+  @ApiOperation({
+    summary:
+      'Recalcular el índice de progreso de todos los deportistas asignados a categorías en una temporada',
+  })
+  @ApiParam({ name: 'id_season', type: Number })
+  recalculateSeason(@Param('id_season', ParseIntPipe) id_season: number) {
+    return this.weightedProgressIndexService.recalculateForSeason(id_season)
+  }
+
   @Post('recalculate/:id_user')
   @ApiOperation({
-    summary: 'Recalcular el índice de progreso ponderado de un deportista en una temporada',
+    summary:
+      'Recalcular el índice de progreso ponderado de un deportista en una temporada',
   })
   @ApiParam({ name: 'id_user', type: Number })
   recalculate(

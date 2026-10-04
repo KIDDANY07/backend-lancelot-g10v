@@ -1,7 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator'
-import { InjurySeverity, InjuryStatus } from '../entities/injury.entity'
+import {
+  InjuryMechanism,
+  InjurySeverity,
+  InjuryStatus,
+} from '../entities/injury.entity'
 
 export class FilterInjuryDto {
   @IsOptional()
@@ -35,4 +39,12 @@ export class FilterInjuryDto {
   @IsEnum(InjuryStatus)
   @ApiPropertyOptional({ enum: InjuryStatus })
   status?: InjuryStatus
+
+  @IsOptional()
+  @IsEnum(InjuryMechanism)
+  @ApiPropertyOptional({
+    enum: InjuryMechanism,
+    description: 'Filtrar por mecanismo de la lesión',
+  })
+  mechanism?: InjuryMechanism
 }

@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
@@ -12,9 +11,11 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { UsersService } from './users.service'
-import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { FilterUserDto } from './dto/filter-user.dto'
+import { AdminCreateUserDto } from './dto/admin-create-user.dto'
+import { ChangePasswordDto } from './dto/change-password.dto'
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -46,6 +47,22 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Roles('ADMIN')
+  @Post()
+  @ApiOperation({
+    summary: 'Crear un usuario con su rol',
+    description:
+      'Requiere rol ADMIN. Permite crear cuentas del cuerpo técnico (entrenador, director técnico, encargado de salud) o deportistas. La fecha de nacimiento es obligatoria para deportistas.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  @ApiBadRequestResponse({
+    description:
+      'El correo ya existe, el rol no existe o el cuerpo no es válido.',
+  })
+  createByAdmin(@Body() adminCreateUserDto: AdminCreateUserDto) {
+    return this.usersService.createByAdmin(adminCreateUserDto)
+  }
+
+  @Roles('ADMIN')
   @Get()
   @ApiOperation({
     summary: 'Listar usuarios',
@@ -72,7 +89,13 @@ export class UsersController {
     return this.usersService.getById(id_user)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR','DIRECTOR_TECNICO','DEPORTISTA','ENCARGADO_SALUD')
+  @Roles(
+    'ADMIN',
+    'ENTRENADOR',
+    'DIRECTOR_TECNICO',
+    'DEPORTISTA',
+    'ENCARGADO_SALUD',
+  )
   @Get('me')
   @ApiOperation({
     summary: 'Consultar mi perfil',
@@ -85,10 +108,12 @@ export class UsersController {
     return this.usersService.getById(id_user)
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get('athletes')
   @ApiOperation({
     summary: 'Listar deportistas',
-    description: 'Disponible para cualquier usuario autenticado.',
+    description:
+      'Disponible para ADMIN, DIRECTOR_TECNICO, ENTRENADOR y ENCARGADO_SALUD.',
   })
   @ApiQuery({ type: FilterUserDto })
   @ApiOkResponse({ type: UsersPaginatedResponseDto })
@@ -116,12 +141,40 @@ export class UsersController {
     return this.usersService.update(id_user, updateUserDto)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles(
+    'ADMIN',
+    'ENTRENADOR',
+    'DIRECTOR_TECNICO',
+    'DEPORTISTA',
+    'ENCARGADO_SALUD',
+  )
+  @Put('me/password')
+  @ApiOperation({
+    summary: 'Cambiar mi contraseña',
+    description: 'Exige la contraseña actual. Disponible para todos los roles.',
+  })
+  @ApiBadRequestResponse({
+    description: 'La contraseña actual no es correcta o la nueva no es válida.',
+  })
+  changeMyPassword(
+    @GetUser('id_user') id_user: number,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.usersService.changePassword(id_user, changePasswordDto)
+  }
+
+  @Roles(
+    'ADMIN',
+    'ENTRENADOR',
+    'DIRECTOR_TECNICO',
+    'DEPORTISTA',
+    'ENCARGADO_SALUD',
+  )
   @Put('me')
   @ApiOperation({
     summary: 'Actualizar mi perfil',
     description:
-      'El usuario se obtiene del JWT; requiere rol ADMIN o ENTRENADOR.',
+      'El usuario se obtiene del JWT. Solo permite nombres, apellidos, correo y fecha de nacimiento; el rol y la contraseña no se cambian por esta ruta.',
   })
   @ApiOkResponse({ type: UserResponseDto })
   @ApiBadRequestResponse({
@@ -130,9 +183,9 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'El usuario autenticado no existe.' })
   updateMe(
     @GetUser('id_user') id_user: number,
-    @Body() updateUserDto: UpdateUserDto,
+    @Body() updateMyProfileDto: UpdateMyProfileDto,
   ) {
-    return this.usersService.update(id_user, updateUserDto)
+    return this.usersService.updateProfile(id_user, updateMyProfileDto)
   }
 
   @Roles('ADMIN')

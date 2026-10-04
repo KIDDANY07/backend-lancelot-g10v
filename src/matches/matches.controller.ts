@@ -6,6 +6,7 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
   ParseIntPipe,
   Put,
 } from '@nestjs/common'
@@ -13,10 +14,15 @@ import { MatchesService } from './matches.service'
 import { CreateMatchDto } from './dto/create-match.dto'
 import { UpdateMatchDto } from './dto/update-match.dto'
 import { FilterMatchDto } from './dto/filter-match.dto'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
+import { RolesGuard } from 'src/auth/guard/roles.guard'
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -24,6 +30,7 @@ import {
   ApiParam,
   ApiQuery,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger'
 import {
   MatchResponseDto,
@@ -31,12 +38,23 @@ import {
   MessageResponseDto,
 } from 'src/common/dto/api-response.dto'
 
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('matches')
 @ApiTags('Partidos')
+@ApiBearerAuth('bearerAuth')
+@ApiUnauthorizedResponse({ description: 'JWT ausente, inválido o expirado.' })
+@ApiForbiddenResponse({ description: 'El rol no tiene permiso.' })
 @ApiInternalServerErrorResponse({ description: 'Error interno no controlado.' })
 export class MatchesController {
   constructor(private readonly matchesService: MatchesService) {}
 
+  @Roles(
+    'ADMIN',
+    'DIRECTOR_TECNICO',
+    'ENTRENADOR',
+    'ENCARGADO_SALUD',
+    'DEPORTISTA',
+  )
   @Get()
   @ApiOperation({
     summary: 'Listar partidos',
@@ -52,6 +70,13 @@ export class MatchesController {
     return this.matchesService.findAll(filters)
   }
 
+  @Roles(
+    'ADMIN',
+    'DIRECTOR_TECNICO',
+    'ENTRENADOR',
+    'ENCARGADO_SALUD',
+    'DEPORTISTA',
+  )
   @Get('id/:id')
   @ApiOperation({
     summary: 'Consultar partido por ID',
@@ -70,6 +95,7 @@ export class MatchesController {
     return this.matchesService.getById(id_match)
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Post()
   @ApiOperation({
     summary: 'Crear partido',
@@ -85,6 +111,7 @@ export class MatchesController {
     return this.matchesService.create(createMatchDto)
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Put('id/:id')
   @ApiOperation({
     summary: 'Actualizar partido',
@@ -111,6 +138,7 @@ export class MatchesController {
     return this.matchesService.update(id_match, updateMatchDto)
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Delete('id/:id')
   @ApiOperation({
     summary: 'Eliminar partido',

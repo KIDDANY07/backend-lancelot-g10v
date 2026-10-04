@@ -36,6 +36,9 @@ export class MatchStatistic {
   @Column({ type: 'smallint', default: 0 })
   red_cards: number
 
+  @Column({ type: 'smallint', nullable: true })
+  rpe?: number | null
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
 

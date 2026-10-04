@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
@@ -45,7 +44,7 @@ import {
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get()
   @ApiOperation({
     summary: 'Listar categorías',
@@ -60,7 +59,7 @@ export class CategoriesController {
     return this.categoriesService.findAll(filters)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get('id/:id')
   @ApiOperation({
     summary: 'Consultar una categoría',
@@ -73,7 +72,7 @@ export class CategoriesController {
     return this.categoriesService.getById(id_category)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Post()
   @ApiOperation({
     summary: 'Crear una categoría',
@@ -85,7 +84,7 @@ export class CategoriesController {
     return this.categoriesService.create(createCategoryDto)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Put('id/:id')
   @ApiOperation({
     summary: 'Actualizar una categoría',
@@ -102,7 +101,7 @@ export class CategoriesController {
     return this.categoriesService.update(id_category, updateCategoryDto)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Delete('id/:id')
   @ApiOperation({
     summary: 'Eliminar una categoría',

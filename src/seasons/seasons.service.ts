@@ -4,19 +4,27 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { plainToInstance } from 'class-transformer'
-import { Repository } from 'typeorm'
+import { LessThan, Repository } from 'typeorm'
 import { CreateSeasonDto } from './dto/create-season.dto'
 import { FilterSeasonDto } from './dto/filter-season.dto'
 import { ResponseSeasonDto } from './dto/response-season.dto'
 import { UpdateSeasonDto } from './dto/update-season.dto'
-import { Season } from './entities/season.entity'
+import { Season, SeasonStatus } from './entities/season.entity'
+
+export const SEASON_CLOSED_EVENT = 'season.closed'
+
+export interface SeasonClosedEvent {
+  id_season: number
+}
 
 @Injectable()
 export class SeasonsService {
   constructor(
     @InjectRepository(Season)
     private readonly seasonsRepository: Repository<Season>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private validateDateRange(start_date: string, end_date?: string | null) {
@@ -31,6 +39,20 @@ export class SeasonsService {
 
   async findOneById(id_season: number) {
     return this.seasonsRepository.findOne({ where: { id_season } })
+  }
+
+  async findCurrentActive() {
+    return this.seasonsRepository.findOne({
+      where: { status: SeasonStatus.ACTIVE },
+      order: { start_date: 'DESC', id_season: 'DESC' },
+    })
+  }
+
+  async findPrevious(season: Season) {
+    return this.seasonsRepository.findOne({
+      where: { start_date: LessThan(season.start_date) },
+      order: { start_date: 'DESC', id_season: 'DESC' },
+    })
   }
 
   async findAll(filters: FilterSeasonDto) {
@@ -98,9 +120,17 @@ export class SeasonsService {
         status: 'Error',
         mensaje: 'No existe esta temporada',
       })
+    const previousStatus = season.status
     const updated = this.seasonsRepository.merge(season, updateSeasonDto)
     this.validateDateRange(updated.start_date, updated.end_date)
     await this.seasonsRepository.save(updated)
+    if (
+      previousStatus !== SeasonStatus.CLOSED &&
+      updated.status === SeasonStatus.CLOSED
+    )
+      this.eventEmitter.emit(SEASON_CLOSED_EVENT, {
+        id_season,
+      } satisfies SeasonClosedEvent)
     return {
       status: 'Success',
       mensaje: 'Temporada actualizada con éxito',

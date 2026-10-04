@@ -30,6 +30,7 @@ export enum InjuryRiskRuleCode {
   SUSTAINED_ACWR = 'acwr_sostenido',
   SUSTAINED_HIGH_RPE = 'rpe_alto_sostenido',
   RELAPSE = 'recaida',
+  ML_PREDICTION = 'prediccion_ml',
 }
 
 @Entity('injury_risk_assessments')

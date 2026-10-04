@@ -7,6 +7,8 @@ import { InjuryRiskAssessment } from 'src/injury_risk_assessments/entities/injur
 import { Injury } from 'src/injuries/entities/injury.entity'
 import { Match } from 'src/matches/entities/match.entity'
 import { MatchStatistic } from 'src/match_statistics/entities/match-statistic.entity'
+import { InjuryRiskPrediction } from 'src/ml_engine/entities/injury-risk-prediction.entity'
+import { MlFeaturesModule } from 'src/ml_features/ml-features.module'
 import { PhysicalEvaluation } from 'src/physical_evaluations/entities/physical-evaluation.entity'
 import { SeasonsModule } from 'src/seasons/seasons.module'
 import { TalentFlag } from 'src/talent_flags/entities/talent-flag.entity'
@@ -17,6 +19,8 @@ import { UsersModule } from 'src/users/users.module'
 import { WeightedProgressIndex } from 'src/weighted_progress_index/entities/weighted-progress-index.entity'
 import { ReportsController } from './reports.controller'
 import { ReportsService } from './reports.service'
+import { ValidationMetricsService } from './validation-metrics.service'
+import { ValidationReportService } from './validation-report.service'
 
 @Module({
   imports: [
@@ -34,11 +38,17 @@ import { ReportsService } from './reports.service'
       Match,
       MatchStatistic,
       WeightedProgressIndex,
+      InjuryRiskPrediction,
     ]),
     UsersModule,
     SeasonsModule,
+    MlFeaturesModule,
   ],
   controllers: [ReportsController],
-  providers: [ReportsService],
+  providers: [
+    ReportsService,
+    ValidationReportService,
+    ValidationMetricsService,
+  ],
 })
 export class ReportsModule {}

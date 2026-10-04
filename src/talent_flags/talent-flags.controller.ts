@@ -25,6 +25,7 @@ import { CreateTalentFlagDto } from './dto/create-talent-flag.dto'
 import { FilterTalentFlagDto } from './dto/filter-talent-flag.dto'
 import { ResponseTalentFlagDto } from './dto/response-talent-flag.dto'
 import { UpdateTalentFlagDto } from './dto/update-talent-flag.dto'
+import { TalentDetectionService } from './talent-detection.service'
 import { TalentFlagsService } from './talent-flags.service'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -33,7 +34,10 @@ import { TalentFlagsService } from './talent-flags.service'
 @ApiBearerAuth('bearerAuth')
 @Controller('talent-flags')
 export class TalentFlagsController {
-  constructor(private readonly talentFlagsService: TalentFlagsService) {}
+  constructor(
+    private readonly talentFlagsService: TalentFlagsService,
+    private readonly talentDetectionService: TalentDetectionService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar señalizaciones de talento' })
@@ -48,6 +52,17 @@ export class TalentFlagsController {
   @ApiOkResponse({ type: ResponseTalentFlagDto })
   getById(@Param('id', ParseIntPipe) id_flag: number) {
     return this.talentFlagsService.getById(id_flag)
+  }
+
+  @Post('detect/:id_season')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO')
+  @ApiOperation({
+    summary:
+      'Detectar automáticamente jugadores con potencial de ascenso en una temporada (recalcula los índices y deja las señalizaciones en estado open para revisión del director técnico)',
+  })
+  @ApiParam({ name: 'id_season', type: Number })
+  detect(@Param('id_season', ParseIntPipe) id_season: number) {
+    return this.talentDetectionService.detectForSeason(id_season)
   }
 
   @Post()

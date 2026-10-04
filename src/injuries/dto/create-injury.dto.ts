@@ -10,7 +10,11 @@ import {
   Length,
   Min,
 } from 'class-validator'
-import { InjurySeverity, InjuryStatus } from '../entities/injury.entity'
+import {
+  InjuryMechanism,
+  InjurySeverity,
+  InjuryStatus,
+} from '../entities/injury.entity'
 
 export class CreateInjuryDto {
   @Type(() => Number)
@@ -47,6 +51,27 @@ export class CreateInjuryDto {
   @IsEnum(InjuryStatus)
   @ApiPropertyOptional({ enum: InjuryStatus, default: InjuryStatus.ACTIVE })
   status?: InjuryStatus
+
+  @IsOptional()
+  @IsEnum(InjuryMechanism)
+  @ApiPropertyOptional({
+    enum: InjuryMechanism,
+    example: InjuryMechanism.SIN_CONTACTO,
+    description:
+      'Mecanismo de la lesión. Necesario para usarla como etiqueta del modelo de riesgo (solo cuentan las lesiones sin contacto)',
+  })
+  mechanism?: InjuryMechanism
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @ApiPropertyOptional({
+    example: 14,
+    description:
+      'Días de baja. Si no se envía y llega recovery_date, se calcula como la diferencia en días con injury_date',
+  })
+  time_loss_days?: number
 
   @Type(() => Number)
   @IsInt()

@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
@@ -51,7 +50,7 @@ export class AthletesInCategoriesController {
     private readonly athletesInCategoriesService: AthletesInCategoriesService,
   ) {}
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get()
   @ApiOperation({
     summary: 'Listar asignaciones a categorías',
@@ -64,7 +63,7 @@ export class AthletesInCategoriesController {
     return this.athletesInCategoriesService.findAll(filters)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get('id/:id')
   @ApiOperation({
     summary: 'Consultar asignación por ID',
@@ -109,7 +108,7 @@ export class AthletesInCategoriesController {
     return this.athletesInCategoriesService.getByIdUser(id_user)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Post()
   @ApiOperation({
     summary: 'Asignar deportista a categoría',
@@ -124,7 +123,7 @@ export class AthletesInCategoriesController {
     return this.athletesInCategoriesService.create(createAthletesInCategoryDto)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Put('id/:id')
   @ApiOperation({
     summary: 'Actualizar asignación a categoría',
@@ -147,7 +146,7 @@ export class AthletesInCategoriesController {
     )
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Delete('id/:id')
   @ApiOperation({
     summary: 'Eliminar asignación a categoría',

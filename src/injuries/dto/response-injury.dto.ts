@@ -1,6 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Expose, Transform } from 'class-transformer'
-import { InjurySeverity, InjuryStatus } from '../entities/injury.entity'
+import {
+  InjuryMechanism,
+  InjurySeverity,
+  InjuryStatus,
+} from '../entities/injury.entity'
 
 export class ResponseInjuryDto {
   @Expose()
@@ -35,12 +39,24 @@ export class ResponseInjuryDto {
   diagnosis?: string | null
 
   @Expose()
-  @ApiPropertyOptional({ example: '2026-03-16', format: 'date', nullable: true })
+  @ApiPropertyOptional({
+    example: '2026-03-16',
+    format: 'date',
+    nullable: true,
+  })
   recovery_date?: string | null
 
   @Expose()
   @ApiProperty({ enum: InjuryStatus })
   status: InjuryStatus
+
+  @Expose()
+  @ApiPropertyOptional({ enum: InjuryMechanism, nullable: true })
+  mechanism?: InjuryMechanism | null
+
+  @Expose()
+  @ApiPropertyOptional({ example: 14, nullable: true })
+  time_loss_days?: number | null
 
   @Expose()
   @ApiProperty({ example: 2 })

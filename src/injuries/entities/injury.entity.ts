@@ -21,6 +21,11 @@ export enum InjuryStatus {
   RECOVERED = 'recovered',
 }
 
+export enum InjuryMechanism {
+  CONTACTO = 'contacto',
+  SIN_CONTACTO = 'sin_contacto',
+}
+
 @Entity('injuries')
 export class Injury {
   @PrimaryGeneratedColumn()
@@ -50,6 +55,12 @@ export class Injury {
     default: InjuryStatus.ACTIVE,
   })
   status: InjuryStatus
+
+  @Column({ type: 'enum', enum: InjuryMechanism, nullable: true })
+  mechanism?: InjuryMechanism | null
+
+  @Column({ type: 'int', nullable: true })
+  time_loss_days?: number | null
 
   @Column()
   registered_by: number

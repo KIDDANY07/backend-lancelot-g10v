@@ -42,6 +42,45 @@ export class AthletesInCategoriesService {
     return athInCat
   }
 
+  async findActiveSeasonCategoryMap(): Promise<Map<number, number>> {
+    const season = await this.seasonsService.findCurrentActive()
+    if (!season) return new Map()
+    const assignments = await this.athInCatRepository.find({
+      where: { id_season: season.id_season },
+      select: { id_user: true, id_category: true },
+    })
+    return new Map(
+      assignments.map((assignment) => [
+        assignment.id_user,
+        assignment.id_category,
+      ]),
+    )
+  }
+
+  async findActiveSeasonAssignment(id_user: number) {
+    const season = await this.seasonsService.findCurrentActive()
+    if (!season) return null
+    return this.athInCatRepository.findOne({
+      where: { id_user, id_season: season.id_season },
+    })
+  }
+
+  async findActiveSeasonRoster(id_category: number) {
+    const season = await this.seasonsService.findCurrentActive()
+    if (!season) return { season: null, roster: [] }
+    const roster = await this.athInCatRepository
+      .createQueryBuilder('assignment')
+      .leftJoin('assignment.user', 'user')
+      .addSelect(['user.id_user', 'user.name', 'user.lastname'])
+      .where('assignment.id_season = :id_season', {
+        id_season: season.id_season,
+      })
+      .andWhere('assignment.id_category = :id_category', { id_category })
+      .orderBy('user.lastname', 'ASC')
+      .getMany()
+    return { season, roster }
+  }
+
   async findHistoryByIdUser(id_user: number) {
     return this.athInCatRepository.find({
       where: { id_user },
@@ -233,7 +272,8 @@ export class AthletesInCategoriesService {
       if (error?.code === '23505')
         throw new BadRequestException({
           status: 'Error',
-          mensaje: 'Este deportista ya esta asignado a esta categoria o temporada',
+          mensaje:
+            'Este deportista ya esta asignado a esta categoria o temporada',
         })
       throw error
     }
@@ -249,7 +289,8 @@ export class AthletesInCategoriesService {
         status: 'Error',
         mensaje: 'No existe este deportista en categoria',
       })
-    const id_user = updateAthletesInCategoryDto.id_user ?? existsAthInCat.id_user
+    const id_user =
+      updateAthletesInCategoryDto.id_user ?? existsAthInCat.id_user
     const id_category =
       updateAthletesInCategoryDto.id_category ?? existsAthInCat.id_category
     const id_season =

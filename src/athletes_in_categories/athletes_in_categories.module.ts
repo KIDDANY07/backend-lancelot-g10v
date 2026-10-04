@@ -16,5 +16,6 @@ import { SeasonsModule } from 'src/seasons/seasons.module'
   ],
   controllers: [AthletesInCategoriesController],
   providers: [AthletesInCategoriesService],
+  exports: [AthletesInCategoriesService],
 })
 export class AthletesInCategoriesModule {}

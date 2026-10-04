@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Expose, Transform } from 'class-transformer'
 
 export class ResponseMatchStatisticDto {
@@ -40,6 +40,10 @@ export class ResponseMatchStatisticDto {
   @Expose()
   @ApiProperty({ example: 0 })
   red_cards: number
+
+  @Expose()
+  @ApiPropertyOptional({ example: 7, nullable: true })
+  rpe?: number | null
 
   @Expose()
   @ApiProperty({ type: String, format: 'date-time' })

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { plainToInstance } from 'class-transformer'
 import { Repository } from 'typeorm'
@@ -13,6 +17,7 @@ import { TechnicalEvaluation } from 'src/technical_evaluations/entities/technica
 import { TrainingLoad } from 'src/training_loads/entities/training-load.entity'
 import { TrainingSession } from 'src/training_sessions/entities/training-session.entity'
 import { UsersService } from 'src/users/users.service'
+import { extractErrorMessage } from 'src/common/utils/error-message.util'
 import { FilterWeightedProgressIndexDto } from './dto/filter-weighted-progress-index.dto'
 import { ResponseWeightedProgressIndexDto } from './dto/response-weighted-progress-index.dto'
 import { WeightedProgressIndex } from './entities/weighted-progress-index.entity'
@@ -65,8 +70,7 @@ export class WeightedProgressIndexService {
       .take(limit)
 
     if (id_user) query.andWhere('index.id_user = :id_user', { id_user })
-    if (id_season)
-      query.andWhere('index.id_season = :id_season', { id_season })
+    if (id_season) query.andWhere('index.id_season = :id_season', { id_season })
 
     const [indices, total] = await query.getManyAndCount()
     if (!total)
@@ -107,8 +111,42 @@ export class WeightedProgressIndexService {
     })
     const latest = evaluations[0]
     return {
-      vo2max: latest?.vo2max_estimado != null ? Number(latest.vo2max_estimado) : null,
+      vo2max:
+        latest?.vo2max_estimado != null ? Number(latest.vo2max_estimado) : null,
       speed20m: latest?.speed_20m != null ? Number(latest.speed_20m) : null,
+    }
+  }
+
+  async recalculateForSeason(id_season: number) {
+    const season = await this.seasonsService.findOneById(id_season)
+    if (!season)
+      throw new NotFoundException({
+        status: 'Error',
+        mensaje: 'No existe esta temporada',
+      })
+
+    const assignments = await this.athletesInCategoryRepository.find({
+      where: { id_season },
+      select: { id_user: true },
+    })
+    const userIds = [...new Set(assignments.map((a) => a.id_user))]
+
+    let recalculated = 0
+    const failed: { id_user: number; mensaje: string }[] = []
+    for (const id_user of userIds) {
+      try {
+        await this.calculateForAthleteSeason(id_user, id_season)
+        recalculated++
+      } catch (error) {
+        failed.push({ id_user, mensaje: extractErrorMessage(error) })
+      }
+    }
+
+    return {
+      status: 'Success',
+      mensaje: `Recálculo de índices de la temporada completado: ${recalculated} recalculados, ${failed.length} con error`,
+      recalculated,
+      failed,
     }
   }
 
@@ -152,10 +190,11 @@ export class WeightedProgressIndexService {
         mensaje: 'No existe la categoría asignada al deportista',
       })
 
-    const profile = await this.positionWeightProfilesService.findByPositionAndAgeCategory(
-      athInCat.position,
-      category.name,
-    )
+    const profile =
+      await this.positionWeightProfilesService.findByPositionAndAgeCategory(
+        athInCat.position,
+        category.name,
+      )
     if (!profile)
       throw new BadRequestException({
         status: 'Error',
@@ -190,9 +229,11 @@ export class WeightedProgressIndexService {
     })
 
     // --- Technical score: average of the season's evaluations, scaled to 0-100 ---
-    const technicalEvaluations = await this.technicalEvaluationsRepository.find({
-      where: { id_user, id_season },
-    })
+    const technicalEvaluations = await this.technicalEvaluationsRepository.find(
+      {
+        where: { id_user, id_season },
+      },
+    )
     const technical = this.progressIndexCalculatorService.computeTechnicalScore(
       technicalEvaluations.map((e) => Number(e.score)),
     )
@@ -239,10 +280,11 @@ export class WeightedProgressIndexService {
       )
     }
 
-    const participation = this.progressIndexCalculatorService.computeParticipationScore(
-      trainingRatio,
-      matchRatio,
-    )
+    const participation =
+      this.progressIndexCalculatorService.computeParticipationScore(
+        trainingRatio,
+        matchRatio,
+      )
 
     const index_value = this.progressIndexCalculatorService.computeIndex(
       physical.score,

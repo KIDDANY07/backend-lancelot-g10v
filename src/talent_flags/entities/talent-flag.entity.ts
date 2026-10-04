@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -16,6 +17,16 @@ export enum TalentFlagStatus {
   DISMISSED = 'dismissed',
 }
 
+export enum TalentFlagSource {
+  MANUAL = 'manual',
+  RULES = 'rules',
+  ML = 'ml',
+}
+
+@Index('UQ_talent_flags_rules_user_season', ['id_user', 'id_season'], {
+  unique: true,
+  where: "source = 'rules'",
+})
 @Entity('talent_flags')
 export class TalentFlag {
   @PrimaryGeneratedColumn()
@@ -40,8 +51,24 @@ export class TalentFlag {
   })
   status: TalentFlagStatus
 
-  @Column()
-  created_by: number
+  @Column({
+    type: 'enum',
+    enum: TalentFlagSource,
+    default: TalentFlagSource.MANUAL,
+  })
+  source: TalentFlagSource
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  score?: number | null
+
+  @Column({ type: 'simple-array', nullable: true })
+  triggered_rules?: string[] | null
+
+  @Column({ type: 'simple-json', nullable: true })
+  warnings?: string[] | null
+
+  @Column({ nullable: true })
+  created_by?: number | null
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
@@ -57,7 +84,7 @@ export class TalentFlag {
   @JoinColumn({ name: 'id_season' })
   season: Season
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'created_by' })
-  createdByUser: User
+  createdByUser?: User | null
 }

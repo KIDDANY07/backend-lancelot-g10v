@@ -38,6 +38,27 @@ export class InjuriesService {
       })
   }
 
+  private computeTimeLossDays(injury_date: string, recovery_date: string) {
+    const start = Date.parse(`${injury_date.slice(0, 10)}T00:00:00Z`)
+    const end = Date.parse(`${recovery_date.slice(0, 10)}T00:00:00Z`)
+    return Math.max(0, Math.round((end - start) / 86_400_000))
+  }
+
+  private fillTimeLossDays(
+    injury: Partial<Injury>,
+    dto: { time_loss_days?: number; recovery_date?: string },
+  ) {
+    if (
+      dto.time_loss_days === undefined &&
+      dto.recovery_date &&
+      injury.injury_date
+    )
+      injury.time_loss_days = this.computeTimeLossDays(
+        injury.injury_date,
+        dto.recovery_date,
+      )
+  }
+
   async findOneById(id_injury: number) {
     return this.injuriesRepository.findOne({
       where: { id_injury },
@@ -46,7 +67,14 @@ export class InjuriesService {
   }
 
   async findAll(filters: FilterInjuryDto) {
-    const { page = 1, limit = 10, id_user, severity, status } = filters
+    const {
+      page = 1,
+      limit = 10,
+      id_user,
+      severity,
+      status,
+      mechanism,
+    } = filters
     const query = this.injuriesRepository
       .createQueryBuilder('injury')
       .leftJoinAndSelect('injury.athlete', 'athlete')
@@ -57,9 +85,10 @@ export class InjuriesService {
       .take(limit)
 
     if (id_user) query.andWhere('injury.id_user = :id_user', { id_user })
-    if (severity)
-      query.andWhere('injury.severity = :severity', { severity })
+    if (severity) query.andWhere('injury.severity = :severity', { severity })
     if (status) query.andWhere('injury.status = :status', { status })
+    if (mechanism)
+      query.andWhere('injury.mechanism = :mechanism', { mechanism })
 
     const [injuries, total] = await query.getManyAndCount()
     if (!total)
@@ -98,7 +127,9 @@ export class InjuriesService {
       createInjuryDto.id_user,
       createInjuryDto.registered_by,
     )
-    const injury = await this.injuriesRepository.save(createInjuryDto)
+    const data: Partial<Injury> = { ...createInjuryDto }
+    this.fillTimeLossDays(data, createInjuryDto)
+    const injury = await this.injuriesRepository.save(data)
     return this.getById(injury.id_injury)
   }
 
@@ -110,6 +141,7 @@ export class InjuriesService {
         mensaje: 'No existe esta lesión',
       })
     const updated = this.injuriesRepository.merge(injury, updateInjuryDto)
+    this.fillTimeLossDays(updated, updateInjuryDto)
     await this.validateReferences(updated.id_user, updated.registered_by)
     await this.injuriesRepository.save(updated)
     return this.getById(id_injury)

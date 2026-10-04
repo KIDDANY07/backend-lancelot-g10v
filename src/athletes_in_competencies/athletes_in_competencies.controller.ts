@@ -50,10 +50,12 @@ export class AthletesInCompetenciesController {
     private readonly athletesInCompetenciesService: AthletesInCompetenciesService,
   ) {}
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get()
   @ApiOperation({
     summary: 'Listar asignaciones a competencias',
-    description: 'Disponible para cualquier usuario autenticado.',
+    description:
+      'Disponible para ADMIN, DIRECTOR_TECNICO, ENTRENADOR y ENCARGADO_SALUD.',
   })
   @ApiQuery({ type: FilterAthInComp })
   @ApiOkResponse({ type: AthletesInCompetenciesPaginatedResponseDto })
@@ -62,10 +64,12 @@ export class AthletesInCompetenciesController {
     return this.athletesInCompetenciesService.findAll(filters)
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get('id/:id')
   @ApiOperation({
     summary: 'Consultar asignación por ID',
-    description: 'Disponible para cualquier usuario autenticado.',
+    description:
+      'Disponible para ADMIN, DIRECTOR_TECNICO, ENTRENADOR y ENCARGADO_SALUD.',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiOkResponse({ type: AthleteInCompetencyResponseDto })
@@ -88,6 +92,7 @@ export class AthletesInCompetenciesController {
     return this.athletesInCompetenciesService.getByUserId(id_user)
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Post()
   @ApiOperation({ summary: 'Asignar deportista a competencia' })
   @ApiCreatedResponse({ type: AthleteInCompetencyResponseDto })
@@ -101,6 +106,7 @@ export class AthletesInCompetenciesController {
     )
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Put('id/:id')
   @ApiOperation({
     summary: 'Actualizar asignación a competencia',
@@ -122,6 +128,7 @@ export class AthletesInCompetenciesController {
     )
   }
 
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Delete('id/:id')
   @ApiOperation({ summary: 'Eliminar asignación a competencia' })
   @ApiParam({ name: 'id', type: Number, example: 1 })

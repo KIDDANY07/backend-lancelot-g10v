@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
@@ -46,7 +45,7 @@ import {
 export class CompetenciesController {
   constructor(private readonly competenciesService: CompetenciesService) {}
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get()
   @ApiOperation({
     summary: 'Listar competencias',
@@ -61,7 +60,7 @@ export class CompetenciesController {
     return this.competenciesService.findAll(filters)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'ENCARGADO_SALUD')
   @Get('id/:id')
   @ApiOperation({
     summary: 'Consultar una competencia',
@@ -74,7 +73,7 @@ export class CompetenciesController {
     return this.competenciesService.getById(id_competency)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Post()
   @ApiOperation({
     summary: 'Crear una competencia',
@@ -86,7 +85,7 @@ export class CompetenciesController {
     return this.competenciesService.create(createCompetencyDto)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Put('id/:id')
   @ApiOperation({
     summary: 'Actualizar una competencia',
@@ -104,7 +103,7 @@ export class CompetenciesController {
     return this.competenciesService.update(id_competency, updateCompetencyDto)
   }
 
-  @Roles('ADMIN', 'ENTRENADOR')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Delete('id/:id')
   @ApiOperation({
     summary: 'Eliminar una competencia',

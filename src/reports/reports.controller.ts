@@ -1,14 +1,24 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common'
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
+import { ValidationReportQueryDto } from './dto/validation-report-query.dto'
 import { ReportsService } from './reports.service'
+import { ValidationReportService } from './validation-report.service'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
@@ -16,7 +26,24 @@ import { ReportsService } from './reports.service'
 @ApiBearerAuth('bearerAuth')
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly validationReportService: ValidationReportService,
+  ) {}
+
+  @Get('validation')
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENCARGADO_SALUD')
+  @ApiOperation({
+    summary:
+      'Métricas para la validación del sistema con el club: alertas y evaluaciones por nivel y estado, tasa de descarte, sensibilidad y valor predictivo de la fase 1, aceptación de señalizaciones de talento, modo sombra y calidad de datos. Los cocientes sin denominador se devuelven en null con una advertencia',
+  })
+  @ApiQuery({ type: ValidationReportQueryDto })
+  validation(@Query() query: ValidationReportQueryDto) {
+    return this.validationReportService.getValidationReport(
+      query.from,
+      query.to,
+    )
+  }
 
   @Get('season-comparison/:id_user')
   @ApiOperation({

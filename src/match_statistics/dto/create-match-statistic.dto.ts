@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsInt, IsOptional, Min } from 'class-validator'
+import { IsInt, IsOptional, Max, Min } from 'class-validator'
 
 export class CreateMatchStatisticDto {
   @Type(() => Number)
@@ -48,4 +48,18 @@ export class CreateMatchStatisticDto {
   @Min(0)
   @ApiPropertyOptional({ example: 0, default: 0 })
   red_cards?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  @ApiPropertyOptional({
+    example: 7,
+    minimum: 0,
+    maximum: 10,
+    description:
+      'Esfuerzo percibido del partido (escala 0-10). Si se registra, el partido suma carga (RPE x minutos jugados) al ACWR',
+  })
+  rpe?: number
 }
