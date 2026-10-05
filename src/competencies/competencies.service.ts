@@ -111,7 +111,11 @@ export class CompetenciesService {
         status: 'Error',
         mensaje: 'No existe esta temporada',
       })
-    const competency = await this.competencyRepository.save(createCompetencyDto)
+    const { finish, ...competencyData } = createCompetencyDto
+    const competency = await this.competencyRepository.save({
+      ...competencyData,
+      ...(finish ? { finish_date: finish } : {}),
+    })
     return {
       status: 'Success',
       mensaje: 'Creacion de competencia exitosa',
@@ -139,10 +143,11 @@ export class CompetenciesService {
           mensaje: 'No existe esta temporada',
         })
     }
-    const competency = await this.competencyRepository.merge(
-      existsCompetency,
-      updateCompetencyDto,
-    )
+    const { finish, ...competencyChanges } = updateCompetencyDto
+    const competency = this.competencyRepository.merge(existsCompetency, {
+      ...competencyChanges,
+      ...(finish !== undefined ? { finish_date: finish } : {}),
+    })
     await this.competencyRepository.save(competency)
     return {
       status: 'Success',
