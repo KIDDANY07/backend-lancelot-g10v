@@ -15,12 +15,20 @@ import { ResponseAthInCat } from './dto/response-ath_cat.dto'
 import { UsersService } from 'src/users/users.service'
 import { RolesService } from 'src/roles/roles.service'
 import { SeasonsService } from 'src/seasons/seasons.service'
+import { Category } from 'src/categories/entities/category.entity'
+import {
+  checkCategoryEligibility,
+  pickBaseAssignments,
+  referenceYearOf,
+} from 'src/common/utils/sport-age.util'
 
 @Injectable()
 export class AthletesInCategoriesService {
   constructor(
     @InjectRepository(AthletesInCategory)
     private athInCatRepository: Repository<AthletesInCategory>,
+    @InjectRepository(Category)
+    private categoriesRepository: Repository<Category>,
     private readonly usersService: UsersService,
     private readonly rolesService: RolesService,
     private readonly seasonsService: SeasonsService,
@@ -34,13 +42,37 @@ export class AthletesInCategoriesService {
     return athInCat
   }
 
+  private findDetailed(id_ath_cat: number) {
+    return this.athInCatRepository.findOne({
+      where: { id_ath_cat },
+      relations: { user: true, category: true },
+    })
+  }
+
+  private orderedByAgeGroup(id_user: number, id_season?: number | null) {
+    const query = this.athInCatRepository
+      .createQueryBuilder('assignment')
+      .leftJoinAndSelect('assignment.user', 'user')
+      .leftJoinAndSelect('assignment.category', 'category')
+      .where('assignment.id_user = :id_user', { id_user })
+      .orderBy('category.max_age', 'ASC')
+      .addOrderBy('assignment.id_ath_cat', 'ASC')
+    if (id_season)
+      query.andWhere('assignment.id_season = :id_season', { id_season })
+    return query
+  }
+
+  async findAllByIdUser(id_user: number, id_season?: number | null) {
+    return this.orderedByAgeGroup(id_user, id_season).getMany()
+  }
+
   async findOneByIdUser(id_user: number, id_season?: number) {
-    const athInCat = await this.athInCatRepository.findOne({
-      where: id_season ? { id_user, id_season } : { id_user },
+    if (id_season) return this.orderedByAgeGroup(id_user, id_season).getOne()
+    return this.athInCatRepository.findOne({
+      where: { id_user },
       relations: { user: true, category: true },
       order: { created_at: 'DESC' },
     })
-    return athInCat
   }
 
   async findActiveSeasonCategoryMap(): Promise<Map<number, number>> {
@@ -48,10 +80,13 @@ export class AthletesInCategoriesService {
     if (!season) return new Map()
     const assignments = await this.athInCatRepository.find({
       where: { id_season: season.id_season },
-      select: { id_user: true, id_category: true },
+      relations: { category: true },
     })
+    const base = pickBaseAssignments(assignments, (assignment) =>
+      Number(assignment.category?.max_age ?? Infinity),
+    )
     return new Map(
-      assignments.map((assignment) => [
+      [...base.values()].map((assignment) => [
         assignment.id_user,
         assignment.id_category,
       ]),
@@ -61,9 +96,7 @@ export class AthletesInCategoriesService {
   async findActiveSeasonAssignment(id_user: number) {
     const season = await this.seasonsService.findCurrentActive()
     if (!season) return null
-    return this.athInCatRepository.findOne({
-      where: { id_user, id_season: season.id_season },
-    })
+    return this.orderedByAgeGroup(id_user, season.id_season).getOne()
   }
 
   async findActiveSeasonRoster(id_category: number) {
@@ -165,7 +198,7 @@ export class AthletesInCategoriesService {
   }
 
   async getById(id_ath_cat: number) {
-    const athInCat = await this.findOneById(id_ath_cat)
+    const athInCat = await this.findDetailed(id_ath_cat)
     if (!athInCat)
       throw new NotFoundException({
         status: 'Error',
@@ -180,19 +213,32 @@ export class AthletesInCategoriesService {
     }
   }
 
-  async getByIdUser(id_user: number, id_season?: number) {
-    const athInCat = await this.findOneByIdUser(id_user, id_season)
-    if (!athInCat)
+  async getByIdUser(id_user: number) {
+    const season = await this.seasonsService.findCurrentActive()
+    let assignments = season
+      ? await this.findAllByIdUser(id_user, season.id_season)
+      : []
+    if (assignments.length === 0) {
+      const latest = await this.findOneByIdUser(id_user)
+      assignments = latest
+        ? latest.id_season
+          ? await this.findAllByIdUser(id_user, latest.id_season)
+          : [latest]
+        : []
+    }
+    if (assignments.length === 0)
       throw new NotFoundException({
         status: 'Error',
         mensaje: 'No existe este deportista en categoria',
       })
+    const items = plainToInstance(ResponseAthInCat, assignments, {
+      excludeExtraneousValues: true,
+    })
     return {
       status: 'Success',
-      mensaje: 'Consulta de deportista en competencia exitosa',
-      athInCat: plainToInstance(ResponseAthInCat, athInCat, {
-        excludeExtraneousValues: true,
-      }),
+      mensaje: 'Consulta de las categorías del deportista exitosa',
+      athInCat: items[0],
+      athInCats: items,
     }
   }
 
@@ -219,18 +265,50 @@ export class AthletesInCategoriesService {
     id_season: number | null | undefined,
     excludeIdAthCat?: number,
   ) {
-    const duplicateWhere = id_season
-      ? { id_user, id_season }
-      : { id_user, id_category }
     const existAthInCat = await this.athInCatRepository.findOne({
-      where: duplicateWhere,
+      where: id_season
+        ? { id_user, id_season, id_category }
+        : { id_user, id_category },
     })
     if (existAthInCat && existAthInCat.id_ath_cat !== excludeIdAthCat)
       throw new BadRequestException({
         status: 'Error',
         mensaje: id_season
-          ? 'Este deportista ya esta asignado a una categoria en esta temporada'
+          ? 'Este deportista ya esta en esta categoria en esta temporada'
           : 'Este deportista ya esta en esta categoria',
+      })
+  }
+
+  private async assertEligible(
+    birth_date: string | null | undefined,
+    id_category: number,
+    id_season: number | null | undefined,
+  ) {
+    const category = await this.categoriesRepository.findOne({
+      where: { id_category },
+    })
+    if (!category)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'No existe esta categoria',
+      })
+    const season = id_season
+      ? await this.seasonsService.findOneById(id_season)
+      : null
+    if (id_season && !season)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'No existe esta temporada',
+      })
+    const eligibility = checkCategoryEligibility(
+      birth_date,
+      category,
+      referenceYearOf(season?.start_date),
+    )
+    if (!eligibility.eligible)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: eligibility.reason,
       })
   }
 
@@ -247,16 +325,10 @@ export class AthletesInCategoriesService {
         status: 'Error',
         mensaje: 'Este usuario no es un deportista',
       })
-    if (id_season) {
-      const existSeason = await this.seasonsService.findOneById(id_season)
-      if (!existSeason)
-        throw new BadRequestException({
-          status: 'Error',
-          mensaje: 'No existe esta temporada',
-        })
-    }
+    await this.assertEligible(existUser.birth_date, id_category, id_season)
     await this.assertNoDuplicateAssignment(id_user, id_category, id_season)
-    const athInCat = await this.saveAssignment(createAthletesInCategoryDto)
+    const saved = await this.saveAssignment(createAthletesInCategoryDto)
+    const athInCat = await this.findDetailed(saved.id_ath_cat)
     return {
       status: 'Success',
       mensaje: 'Deportista asignado a la categoria de forma exitosa',
@@ -274,7 +346,7 @@ export class AthletesInCategoriesService {
         throw new BadRequestException({
           status: 'Error',
           mensaje:
-            'Este deportista ya esta asignado a esta categoria o temporada',
+            'Este deportista ya esta en esta categoria en esta temporada',
         })
       throw error
     }
@@ -296,27 +368,29 @@ export class AthletesInCategoriesService {
       updateAthletesInCategoryDto.id_category ?? existsAthInCat.id_category
     const id_season =
       updateAthletesInCategoryDto.id_season ?? existsAthInCat.id_season
-    if (updateAthletesInCategoryDto.id_season) {
-      const existSeason = await this.seasonsService.findOneById(
-        updateAthletesInCategoryDto.id_season,
-      )
-      if (!existSeason)
-        throw new BadRequestException({
-          status: 'Error',
-          mensaje: 'No existe esta temporada',
-        })
-    }
+    const athlete =
+      id_user === existsAthInCat.id_user
+        ? existsAthInCat.user
+        : await this.usersService.findOneById(id_user)
+    if (!athlete)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'No existe este usuario',
+      })
+    if (athlete.id_role !== ROLE_IDS.DEPORTISTA)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'Este usuario no es un deportista',
+      })
+    await this.assertEligible(athlete.birth_date, id_category, id_season)
     await this.assertNoDuplicateAssignment(
       id_user,
       id_category,
       id_season,
       id_ath_cat,
     )
-    const athInCat = await this.athInCatRepository.merge(
-      existsAthInCat,
-      updateAthletesInCategoryDto,
-    )
-    await this.saveAssignment(athInCat)
+    await this.saveAssignment({ id_ath_cat, ...updateAthletesInCategoryDto })
+    const athInCat = await this.findDetailed(id_ath_cat)
     return {
       status: 'Success',
       mensaje: 'Deportista en categoria actualizado de forma exitosa',

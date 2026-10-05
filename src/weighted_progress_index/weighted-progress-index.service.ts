@@ -165,9 +165,25 @@ export class WeightedProgressIndexService {
         mensaje: 'No existe esta temporada',
       })
 
-    const athInCat = await this.athletesInCategoryRepository.findOne({
-      where: { id_user, id_season },
-    })
+    const seasonAssignments = await this.athletesInCategoryRepository
+      .createQueryBuilder('assignment')
+      .leftJoin('assignment.category', 'category')
+      .where('assignment.id_user = :id_user', { id_user })
+      .andWhere('assignment.id_season = :id_season', { id_season })
+      .orderBy('category.max_age', 'ASC')
+      .addOrderBy('assignment.id_ath_cat', 'ASC')
+      .getMany()
+    const baseAssignment = seasonAssignments[0]
+    const athInCat = baseAssignment
+      ? {
+          ...baseAssignment,
+          position:
+            baseAssignment.position ??
+            seasonAssignments.find((assignment) => assignment.position)
+              ?.position ??
+            null,
+        }
+      : null
     if (!athInCat)
       throw new BadRequestException({
         status: 'Error',

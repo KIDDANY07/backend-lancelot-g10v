@@ -73,10 +73,16 @@ export class ReportsService {
         mensaje: 'No existe esta temporada',
       })
 
-    const athInCat = await this.athletesInCategoryRepository.findOne({
-      where: { id_user, id_season },
-      relations: { category: true },
-    })
+    const assignments = await this.athletesInCategoryRepository
+      .createQueryBuilder('assignment')
+      .leftJoinAndSelect('assignment.category', 'category')
+      .where('assignment.id_user = :id_user', { id_user })
+      .andWhere('assignment.id_season = :id_season', { id_season })
+      .orderBy('category.max_age', 'ASC')
+      .addOrderBy('assignment.id_ath_cat', 'ASC')
+      .getMany()
+    const athInCat = assignments[0] ?? null
+    const categoryIds = assignments.map((assignment) => assignment.id_category)
 
     const seasonStart = season.start_date
     const seasonEnd = season.end_date ?? new Date().toISOString().slice(0, 10)
@@ -160,15 +166,13 @@ export class ReportsService {
 
     if (athInCat) {
       const totalSessions = await this.trainingSessionsRepository.count({
-        where: { id_category: athInCat.id_category, id_season },
+        where: { id_category: In(categoryIds), id_season },
       })
       const loads = await this.trainingLoadsRepository
         .createQueryBuilder('load')
         .innerJoin('load.session', 'session')
         .where('load.id_user = :id_user', { id_user })
-        .andWhere('session.id_category = :id_category', {
-          id_category: athInCat.id_category,
-        })
+        .andWhere('session.id_category IN (:...categoryIds)', { categoryIds })
         .andWhere('session.id_season = :id_season', { id_season })
         .getMany()
       const sessionsAttended = new Set(loads.map((l) => l.id_session)).size
@@ -194,9 +198,7 @@ export class ReportsService {
       const seasonMatches = await this.matchesRepository
         .createQueryBuilder('match')
         .innerJoin('match.competency', 'competency')
-        .where('match.id_category = :id_category', {
-          id_category: athInCat.id_category,
-        })
+        .where('match.id_category IN (:...categoryIds)', { categoryIds })
         .andWhere('competency.id_season = :id_season', { id_season })
         .getMany()
 
@@ -208,10 +210,16 @@ export class ReportsService {
         matchParticipation = {
           matches_in_season: seasonMatches.length,
           matches_played: relevantStats.length,
-          total_minutes: relevantStats.reduce((sum, s) => sum + s.minutes_played, 0),
+          total_minutes: relevantStats.reduce(
+            (sum, s) => sum + s.minutes_played,
+            0,
+          ),
           goals: relevantStats.reduce((sum, s) => sum + s.goals, 0),
           assists: relevantStats.reduce((sum, s) => sum + s.assists, 0),
-          yellow_cards: relevantStats.reduce((sum, s) => sum + s.yellow_cards, 0),
+          yellow_cards: relevantStats.reduce(
+            (sum, s) => sum + s.yellow_cards,
+            0,
+          ),
           red_cards: relevantStats.reduce((sum, s) => sum + s.red_cards, 0),
         }
       }
@@ -227,6 +235,11 @@ export class ReportsService {
           lastname: athlete.lastname,
           position: athInCat?.position ?? null,
           category: athInCat?.category?.name ?? null,
+          categories: assignments.map((assignment) => ({
+            id_category: assignment.id_category,
+            name: assignment.category?.name ?? null,
+            position: assignment.position ?? null,
+          })),
         },
         season: {
           id_season: season.id_season,
@@ -241,9 +254,13 @@ export class ReportsService {
         injuries: plainToInstance(ResponseInjuryDto, injuries, {
           excludeExtraneousValues: true,
         }),
-        fatigue_alerts: plainToInstance(ResponseFatigueAlertDto, fatigueAlerts, {
-          excludeExtraneousValues: true,
-        }),
+        fatigue_alerts: plainToInstance(
+          ResponseFatigueAlertDto,
+          fatigueAlerts,
+          {
+            excludeExtraneousValues: true,
+          },
+        ),
         injury_risk_assessments: plainToInstance(
           ResponseInjuryRiskAssessmentDto,
           injuryRiskAssessments,

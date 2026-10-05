@@ -9,7 +9,6 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
-  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm'
@@ -53,7 +52,7 @@ export class Competency {
   @OneToMany(() => Match, (match) => match.competency)
   match: Match[]
 
-  @OneToOne(() => Category, (category) => category.competency)
+  @ManyToOne(() => Category, (category) => category.competencies)
   @JoinColumn({ name: 'id_category' })
   category: Category
 

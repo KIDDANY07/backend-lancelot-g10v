@@ -12,14 +12,22 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 
-@Index('UQ_athletes_in_categories_user_season', ['id_user', 'id_season'], {
-  unique: true,
-  where: 'id_season IS NOT NULL',
-})
-@Index('UQ_athletes_in_categories_user_category_legacy', ['id_user', 'id_category'], {
-  unique: true,
-  where: 'id_season IS NULL',
-})
+@Index(
+  'UQ_athletes_in_categories_user_season_category',
+  ['id_user', 'id_season', 'id_category'],
+  {
+    unique: true,
+    where: 'id_season IS NOT NULL',
+  },
+)
+@Index(
+  'UQ_athletes_in_categories_user_category_legacy',
+  ['id_user', 'id_category'],
+  {
+    unique: true,
+    where: 'id_season IS NULL',
+  },
+)
 @Entity('athletes_in_categories')
 export class AthletesInCategory {
   @PrimaryGeneratedColumn()

@@ -7,7 +7,6 @@ import {
   Entity,
   JoinColumn,
   OneToMany,
-  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm'
@@ -42,6 +41,6 @@ export class Category {
   @OneToMany(() => Match, (match) => match.category)
   match: Match[]
 
-  @OneToOne(() => Competency, (competency) => competency.category)
-  competency: Competency
+  @OneToMany(() => Competency, (competency) => competency.category)
+  competencies: Competency[]
 }

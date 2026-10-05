@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { plainToInstance } from 'class-transformer'
 import { Between, In, IsNull, Not, Repository } from 'typeorm'
 import { AthletesInCategory } from 'src/athletes_in_categories/entities/athletes_in_category.entity'
+import { pickBaseAssignments } from 'src/common/utils/sport-age.util'
 import {
   addDaysToKey,
   daysBetween,
@@ -110,19 +111,27 @@ export class MlFeaturesService {
       }),
       this.athletesInCategoryRepository.find({
         where: { id_user: In(athleteIds), id_season: Not(IsNull()) },
+        relations: { category: true },
         select: {
+          id_ath_cat: true,
           id_user: true,
           id_season: true,
           id_category: true,
           position: true,
+          category: { id_category: true, max_age: true },
         },
       }),
     ])
     const birthDateByUser = new Map(
       athletes.map((a) => [a.id_user, a.birth_date ?? null]),
     )
+    const baseAssignments = pickBaseAssignments(
+      assignments,
+      (assignment) => Number(assignment.category?.max_age ?? Infinity),
+      (assignment) => `${assignment.id_user}-${assignment.id_season}`,
+    )
     const assignmentByKey = new Map<string, AssignmentInfo>(
-      assignments.map((a) => [
+      [...baseAssignments.values()].map((a) => [
         `${a.id_user}-${a.id_season}`,
         { id_category: a.id_category, position: a.position ?? null },
       ]),

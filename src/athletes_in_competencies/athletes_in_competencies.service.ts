@@ -14,6 +14,11 @@ import { AthletesInCompetency } from './entities/athletes_in_competency.entity'
 import { plainToInstance } from 'class-transformer'
 import { ResponseAthInComp } from './dto/response-athletes_in_competency.dto'
 import { UsersService } from 'src/users/users.service'
+import { Competency } from 'src/competencies/entities/competency.entity'
+import {
+  checkCategoryEligibility,
+  referenceYearOf,
+} from 'src/common/utils/sport-age.util'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 
@@ -22,6 +27,8 @@ export class AthletesInCompetenciesService {
   constructor(
     @InjectRepository(AthletesInCompetency)
     private athInCompRepository: Repository<AthletesInCompetency>,
+    @InjectRepository(Competency)
+    private competenciesRepository: Repository<Competency>,
     private readonly usersService: UsersService,
   ) {}
 
@@ -39,6 +46,32 @@ export class AthletesInCompetenciesService {
       relations: { competency: true, user: true },
     })
     return athInComp
+  }
+
+  private async assertEligible(
+    birth_date: string | null | undefined,
+    id_competency: number,
+  ) {
+    const competency = await this.competenciesRepository.findOne({
+      where: { id_competency },
+      relations: { category: true, season: true },
+    })
+    if (!competency)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'No existe esta competencia',
+      })
+    if (!competency.category) return
+    const eligibility = checkCategoryEligibility(
+      birth_date,
+      competency.category,
+      referenceYearOf(competency.season?.start_date),
+    )
+    if (!eligibility.eligible)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: eligibility.reason,
+      })
   }
 
   async findAll(filters: FilterAthInComp) {
@@ -163,8 +196,12 @@ export class AthletesInCompetenciesService {
     if (existAthInComp)
       throw new BadRequestException({
         status: 'Error',
-        mensaje: 'Ester deportista ya esta en esta competencia',
+        mensaje: 'Este deportista ya esta en esta competencia',
       })
+    await this.assertEligible(
+      existsUser.birth_date,
+      createAthletesInCompetencyDto.id_competency,
+    )
     const athInComp = await this.athInCompRepository.save(
       createAthletesInCompetencyDto,
     )
@@ -187,22 +224,34 @@ export class AthletesInCompetenciesService {
         status: 'Error',
         mensaje: 'No existe este deportista en competencia',
       })
+    const id_user =
+      updateAthletesInCompetencyDto.id_user ?? existsAthInComp.id_user
+    const id_competency =
+      updateAthletesInCompetencyDto.id_competency ??
+      existsAthInComp.id_competency
     const existAthInComp = await this.athInCompRepository.findOne({
-      where: {
-        id_user: updateAthletesInCompetencyDto.id_user,
-        id_competency: updateAthletesInCompetencyDto.id_competency,
-      },
+      where: { id_user, id_competency },
     })
-    if (existAthInComp)
+    if (existAthInComp && existAthInComp.id_ath_comp !== id_ath_comp)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'Este deportista ya esta en esta competencia',
       })
-    const athInComp = await this.athInCompRepository.merge(
-      existsAthInComp,
-      updateAthletesInCompetencyDto,
-    )
-    await this.athInCompRepository.save(athInComp)
+    const athlete =
+      id_user === existsAthInComp.id_user
+        ? existsAthInComp.user
+        : await this.usersService.findOneById(id_user)
+    if (!athlete || athlete.id_role !== ROLE_IDS.DEPORTISTA)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'Este usuario no es un deportista',
+      })
+    await this.assertEligible(athlete.birth_date, id_competency)
+    await this.athInCompRepository.save({
+      id_ath_comp,
+      ...updateAthletesInCompetencyDto,
+    })
+    const athInComp = await this.findOneById(id_ath_comp)
     return {
       status: 'Success',
       mensaje: 'Deportista en competencia actualizado de forma exitosa',

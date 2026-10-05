@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { AthletesInCategory } from 'src/athletes_in_categories/entities/athletes_in_category.entity'
+import { pickBaseAssignments } from 'src/common/utils/sport-age.util'
 import { Category } from 'src/categories/entities/category.entity'
 import { ScopedConfigCache } from 'src/common/scoped_config/scoped-config'
 import { extractErrorMessage } from 'src/common/utils/error-message.util'
@@ -93,7 +94,6 @@ export class TalentDetectionService {
       severeInjuries.map((row) => Number(row.id_user)),
     )
 
-    const assignmentByUser = new Map(assignments.map((a) => [a.id_user, a]))
     const existingFlagByUser = new Map(existingFlags.map((f) => [f.id_user, f]))
     const categoryInfos = categories.map((c) => ({
       id_category: c.id_category,
@@ -102,6 +102,11 @@ export class TalentDetectionService {
       max_age: Number(c.max_age),
     }))
     const categoryById = new Map(categoryInfos.map((c) => [c.id_category, c]))
+    const assignmentByUser = pickBaseAssignments(
+      assignments,
+      (assignment) =>
+        categoryById.get(assignment.id_category)?.max_age ?? Infinity,
+    )
 
     const cohortValues = new Map<number, number[]>()
     for (const index of indices) {
