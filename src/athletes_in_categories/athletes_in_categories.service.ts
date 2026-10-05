@@ -36,7 +36,7 @@ export class AthletesInCategoriesService {
   async findOneByIdUser(id_user: number, id_season?: number) {
     const athInCat = await this.athInCatRepository.findOne({
       where: id_season ? { id_user, id_season } : { id_user },
-      relations: { user: true },
+      relations: { user: true, category: true },
       order: { created_at: 'DESC' },
     })
     return athInCat
