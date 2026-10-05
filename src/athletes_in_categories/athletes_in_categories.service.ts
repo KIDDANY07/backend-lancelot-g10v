@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { ROLE_IDS } from 'src/roles/role-codes'
 import { CreateAthletesInCategoryDto } from './dto/create-athletes_in_category.dto'
 import { UpdateAthletesInCategoryDto } from './dto/update-athletes_in_category.dto'
 import { AthletesInCategory } from './entities/athletes_in_category.entity'
@@ -241,7 +242,7 @@ export class AthletesInCategoriesService {
         status: 'Error',
         mensaje: 'No existe este usuario',
       })
-    if (existUser && existUser.id_role !== 3)
+    if (existUser && existUser.id_role !== ROLE_IDS.DEPORTISTA)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'Este usuario no es un deportista',

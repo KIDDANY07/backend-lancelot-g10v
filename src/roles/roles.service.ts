@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   OnApplicationBootstrap,
 } from '@nestjs/common'
@@ -9,10 +10,12 @@ import { Repository } from 'typeorm'
 import { CreateRoleDto } from './dto/create-role.dto'
 import { UpdateRoleDto } from './dto/update-role.dto'
 import { Role } from './entities/role.entity'
-import { RoleCode } from './role-codes'
+import { ROLE_IDS, RoleCode } from './role-codes'
 
 @Injectable()
 export class RolesService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(RolesService.name)
+
   constructor(
     @InjectRepository(Role)
     private readonly rolesRepository: Repository<Role>,
@@ -23,16 +26,35 @@ export class RolesService implements OnApplicationBootstrap {
   }
 
   private async ensureFunctionalRoles() {
-    const functionalRoles = [
-      RoleCode.DIRECTOR_TECNICO,
-      RoleCode.ENCARGADO_SALUD,
-    ]
-    for (const code of functionalRoles) {
+    for (const code of Object.values(RoleCode)) {
+      const id_role = ROLE_IDS[code]
       const exists = await this.rolesRepository.findOne({
         where: [{ name: code }, { code }],
       })
-      if (!exists) await this.rolesRepository.save({ name: code, code })
+      if (exists) {
+        if (exists.id_role !== id_role)
+          this.logger.warn(
+            `El rol ${code} tiene id ${exists.id_role} y se esperaba ${id_role}. Ejecuta database/roles.sql para normalizar los roles.`,
+          )
+        continue
+      }
+      const idTaken = await this.rolesRepository.findOne({
+        where: { id_role },
+      })
+      if (idTaken) {
+        this.logger.warn(
+          `No se pudo crear el rol ${code}: el id ${id_role} lo usa ${idTaken.code}. Ejecuta database/roles.sql para normalizar los roles.`,
+        )
+        continue
+      }
+      await this.rolesRepository.query(
+        'INSERT INTO roles (id_role, name, code) VALUES ($1, $2, $3)',
+        [id_role, code, code],
+      )
     }
+    await this.rolesRepository.query(
+      "SELECT setval(pg_get_serial_sequence('roles', 'id_role'), GREATEST((SELECT COALESCE(MAX(id_role), 1) FROM roles), 1))",
+    )
   }
 
   async create(createRoleDto: CreateRoleDto) {

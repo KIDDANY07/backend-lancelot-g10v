@@ -25,6 +25,27 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Roles de Lancelot
+
+El backend y el frontend usan estos identificadores fijos. `name` y `code` deben ser iguales al código:
+
+| id_role | name / code |
+|---|---|
+| 1 | ADMIN |
+| 2 | ENTRENADOR |
+| 3 | DEPORTISTA |
+| 4 | DIRECTOR_TECNICO |
+| 5 | ENCARGADO_SALUD |
+
+Al arrancar, el backend crea los roles que falten con su id. Si la tabla ya tiene roles con otros ids (por ejemplo, creados a mano), el arranque lo advierte en el log y no los modifica. Para normalizarlos:
+
+```bash
+npm run db:roles:check
+npm run db:roles
+```
+
+El primero simula los cambios y los revierte. El segundo los aplica: reasigna cada usuario a su rol por código (no por número), recrea los roles con el orden de la tabla y ajusta la secuencia. Todo ocurre en una sola transacción, y si algún usuario tiene un rol desconocido no se aplica nada. El script es `database/roles.sql` y se puede ejecutar varias veces.
+
 ## Project setup
 
 ```bash

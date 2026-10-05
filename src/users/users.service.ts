@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { ROLE_IDS } from 'src/roles/role-codes'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -105,7 +106,7 @@ export class UsersService {
     const query = this.usersRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
-      .where('user.id_role = :idRole', { idRole: 3 })
+      .where('user.id_role = :idRole', { idRole: ROLE_IDS.DEPORTISTA })
       .skip(skip)
       .take(limit)
       .orderBy('user.id_user', 'ASC')
@@ -171,7 +172,7 @@ export class UsersService {
         mensaje: 'Este correo ya esta asociado a un usuario',
       })
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10)
-    const id_role = 3
+    const id_role = ROLE_IDS.DEPORTISTA
     const user = await this.usersRepository.save({
       ...createUserDto,
       password: hashedPassword,
