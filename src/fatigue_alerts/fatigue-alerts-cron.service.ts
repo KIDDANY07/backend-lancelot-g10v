@@ -86,7 +86,8 @@ export class FatigueAlertsCronService {
     if (
       !result.level ||
       result.level === FatigueAlertLevel.BAJO ||
-      result.acwr_value === null
+      result.acwr_value === null ||
+      Number(result.acute_load) === 0
     )
       return
 
