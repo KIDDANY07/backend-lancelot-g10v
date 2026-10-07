@@ -32,6 +32,7 @@ import { InjuryRiskRuleConfigModule } from './injury_risk_rule_config/injury-ris
 import { TalentRuleConfigModule } from './talent_rule_config/talent-rule-config.module'
 import { MlFeaturesModule } from './ml_features/ml-features.module'
 import { MlEngineModule } from './ml_engine/ml-engine.module'
+import { AlertInboxModule } from './alert_inbox/alert-inbox.module'
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { MlEngineModule } from './ml_engine/ml-engine.module'
     TalentRuleConfigModule,
     MlFeaturesModule,
     MlEngineModule,
+    AlertInboxModule,
   ],
   controllers: [],
   providers: [],
