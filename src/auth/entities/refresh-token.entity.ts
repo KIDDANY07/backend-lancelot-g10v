@@ -37,7 +37,7 @@ export class RefreshToken {
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   user: User
 }

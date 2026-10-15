@@ -12,6 +12,10 @@ import { FilterSeasonDto } from './dto/filter-season.dto'
 import { ResponseSeasonDto } from './dto/response-season.dto'
 import { UpdateSeasonDto } from './dto/update-season.dto'
 import { Season, SeasonStatus } from './entities/season.entity'
+import {
+  assertNoReferences,
+  countReferences,
+} from 'src/common/utils/delete-guard.util'
 
 export const SEASON_CLOSED_EVENT = 'season.closed'
 
@@ -147,6 +151,65 @@ export class SeasonsService {
         status: 'Error',
         mensaje: 'No existe esta temporada',
       })
+    const references = await countReferences(
+      this.seasonsRepository.manager,
+      [
+        {
+          table: 'athletes_in_categories',
+          column: 'id_season',
+          singular: 'asignación de deportista',
+          plural: 'asignaciones de deportistas',
+        },
+        {
+          table: 'competencies',
+          column: 'id_season',
+          singular: 'competencia',
+          plural: 'competencias',
+        },
+        {
+          table: 'training_sessions',
+          column: 'id_season',
+          singular: 'sesión de entrenamiento',
+          plural: 'sesiones de entrenamiento',
+        },
+        {
+          table: 'physical_evaluations',
+          column: 'id_season',
+          singular: 'evaluación física',
+          plural: 'evaluaciones físicas',
+        },
+        {
+          table: 'technical_evaluations',
+          column: 'id_season',
+          singular: 'evaluación técnica',
+          plural: 'evaluaciones técnicas',
+        },
+        {
+          table: 'development_objectives',
+          column: 'id_season',
+          singular: 'objetivo de desarrollo',
+          plural: 'objetivos de desarrollo',
+        },
+        {
+          table: 'weighted_progress_indices',
+          column: 'id_season',
+          singular: 'índice de progreso',
+          plural: 'índices de progreso',
+        },
+        {
+          table: 'talent_flags',
+          column: 'id_season',
+          singular: 'señalización de talento',
+          plural: 'señalizaciones de talento',
+        },
+      ],
+      id_season,
+    )
+    assertNoReferences(
+      `la temporada ${season.name}`,
+      references,
+      'Para conservar el historial, ciérrala en lugar de eliminarla.',
+    )
     await this.seasonsRepository.remove(season)
     return { status: 'Success', mensaje: 'Temporada eliminada con éxito' }
   }

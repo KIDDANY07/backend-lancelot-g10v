@@ -38,8 +38,8 @@ export class HealthRecord {
   })
   status: HealthRecordStatus
 
-  @Column()
-  registered_by: number
+  @Column({ type: 'int', nullable: true })
+  registered_by: number | null
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
@@ -47,11 +47,11 @@ export class HealthRecord {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'registered_by' })
   registeredByUser: User
 }

@@ -51,7 +51,9 @@ export class AthletesInCategory {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User, (user) => user.athletesInCategory)
+  @ManyToOne(() => User, (user) => user.athletesInCategory, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'id_user' })
   user: User
 

@@ -26,12 +26,12 @@ export class DevelopmentObjectivesService {
   private async validateReferences(
     id_user: number,
     id_season: number,
-    set_by: number,
+    set_by: number | null,
   ) {
     const [athlete, season, setByUser] = await Promise.all([
       this.usersService.findOneById(id_user),
       this.seasonsService.findOneById(id_season),
-      this.usersService.findOneById(set_by),
+      set_by === null ? null : this.usersService.findOneById(set_by),
     ])
     if (!athlete)
       throw new BadRequestException({
@@ -43,7 +43,7 @@ export class DevelopmentObjectivesService {
         status: 'Error',
         mensaje: 'No existe la temporada indicada',
       })
-    if (!setByUser)
+    if (set_by !== null && !setByUser)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'No existe el usuario que define el objetivo',
@@ -83,13 +83,9 @@ export class DevelopmentObjectivesService {
     return {
       status: 'Success',
       mensaje: 'Consulta de objetivos de desarrollo exitosa',
-      objectives: plainToInstance(
-        ResponseDevelopmentObjectiveDto,
-        objectives,
-        {
-          excludeExtraneousValues: true,
-        },
-      ),
+      objectives: plainToInstance(ResponseDevelopmentObjectiveDto, objectives, {
+        excludeExtraneousValues: true,
+      }),
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
     }
   }

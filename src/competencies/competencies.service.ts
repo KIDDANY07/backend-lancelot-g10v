@@ -10,6 +10,10 @@ import { Competency } from './entities/competency.entity'
 import { Repository } from 'typeorm'
 import { FilterCompetency } from './dto/filter-competency.dto'
 import { SeasonsService } from 'src/seasons/seasons.service'
+import {
+  assertNoReferences,
+  countReferences,
+} from 'src/common/utils/delete-guard.util'
 
 @Injectable()
 export class CompetenciesService {
@@ -163,6 +167,23 @@ export class CompetenciesService {
         status: 'Error',
         mensaje: 'No existe esta competencia',
       })
+    const references = await countReferences(
+      this.competencyRepository.manager,
+      [
+        {
+          table: 'matches',
+          column: 'id_competency',
+          singular: 'partido',
+          plural: 'partidos',
+        },
+      ],
+      id_competency,
+    )
+    assertNoReferences(
+      `la competencia ${competency.name}`,
+      references,
+      'Elimina primero sus partidos; las convocatorias se eliminan junto con la competencia.',
+    )
     await this.competencyRepository.remove(competency)
     return {
       status: 'Success',

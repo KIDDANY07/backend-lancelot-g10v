@@ -45,11 +45,11 @@ export class MatchStatistic {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => Match)
+  @ManyToOne(() => Match, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_match' })
   match: Match
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 }

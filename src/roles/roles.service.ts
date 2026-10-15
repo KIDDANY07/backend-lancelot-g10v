@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,6 +12,10 @@ import { CreateRoleDto } from './dto/create-role.dto'
 import { UpdateRoleDto } from './dto/update-role.dto'
 import { Role } from './entities/role.entity'
 import { ROLE_IDS, RoleCode } from './role-codes'
+import {
+  assertNoReferences,
+  countReferences,
+} from 'src/common/utils/delete-guard.util'
 
 @Injectable()
 export class RolesService implements OnApplicationBootstrap {
@@ -107,6 +112,28 @@ export class RolesService implements OnApplicationBootstrap {
 
   async remove(id_role: number) {
     const role = await this.findOne(id_role)
+    if (Object.values(ROLE_IDS).includes(role.id_role))
+      throw new ConflictException({
+        status: 'Error',
+        mensaje: `El rol ${role.name} es parte del sistema y no se puede eliminar.`,
+      })
+    const references = await countReferences(
+      this.rolesRepository.manager,
+      [
+        {
+          table: 'users',
+          column: 'id_role',
+          singular: 'usuario',
+          plural: 'usuarios',
+        },
+      ],
+      id_role,
+    )
+    assertNoReferences(
+      `el rol ${role.name}`,
+      references,
+      'Cambia primero el rol de esas cuentas.',
+    )
     await this.rolesRepository.remove(role)
     return { status: 'Success', mensaje: 'Rol eliminado con éxito' }
   }

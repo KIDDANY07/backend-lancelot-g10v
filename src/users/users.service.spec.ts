@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, ConflictException } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { Repository } from 'typeorm'
 import { Role } from 'src/roles/entities/role.entity'
@@ -16,7 +16,7 @@ const ROLES = [
   { id_role: 3, name: 'DEPORTISTA', code: 'DEPORTISTA' },
 ]
 
-function buildService(existing: Partial<User> | null = null) {
+function buildService(existing: Partial<User> | null = null, admins = 2) {
   const usersRepository = {
     findOne: jest.fn(
       ({ where }: { where: { id_user?: number; email?: string } }) => {
@@ -30,6 +30,8 @@ function buildService(existing: Partial<User> | null = null) {
       Promise.resolve({ ...data, id_user: 10 }),
     ),
     update: jest.fn(() => Promise.resolve({})),
+    delete: jest.fn(() => Promise.resolve({ affected: 1 })),
+    count: jest.fn(() => Promise.resolve(admins)),
   }
   const rolesRepository = {
     findOne: jest.fn(({ where }: { where: { id_role: number } }) =>
@@ -194,6 +196,42 @@ describe('UsersService', () => {
         BadRequestException,
       )
       expect(usersRepository.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('delete', () => {
+    it('deletes the account and lets the database clean up its related data', async () => {
+      const { service, usersRepository } = buildService({
+        id_user: 8,
+        id_role: 3,
+      })
+      await service.delete(8, 1)
+
+      expect(usersRepository.delete).toHaveBeenCalledWith(8)
+    })
+
+    it('does not let an administrator delete their own account', async () => {
+      const { service, usersRepository } = buildService({
+        id_user: 1,
+        id_role: 1,
+      })
+
+      await expect(service.delete(1, 1)).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      expect(usersRepository.delete).not.toHaveBeenCalled()
+    })
+
+    it('keeps at least one administrator in the club', async () => {
+      const { service, usersRepository } = buildService(
+        { id_user: 4, id_role: 1 },
+        1,
+      )
+
+      await expect(service.delete(4, 9)).rejects.toBeInstanceOf(
+        ConflictException,
+      )
+      expect(usersRepository.delete).not.toHaveBeenCalled()
     })
   })
 

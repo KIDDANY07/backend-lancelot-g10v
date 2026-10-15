@@ -25,8 +25,8 @@ export class HealthRecordAccessLog {
   @Column({ type: 'int', nullable: true })
   id_health?: number | null
 
-  @Column()
-  accessed_by: number
+  @Column({ type: 'int', nullable: true })
+  accessed_by: number | null
 
   @Column({ type: 'enum', enum: HealthRecordAccessAction })
   action: HealthRecordAccessAction
@@ -38,7 +38,7 @@ export class HealthRecordAccessLog {
   @JoinColumn({ name: 'id_health' })
   healthRecord?: HealthRecord | null
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'accessed_by' })
   accessedByUser: User
 }

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { plainToInstance } from 'class-transformer'
 import { Repository } from 'typeorm'
@@ -19,7 +23,10 @@ export class HealthRecordsService {
     private readonly parentalConsentsService: ParentalConsentsService,
   ) {}
 
-  private async validateReferences(id_user: number, registered_by: number) {
+  private async validateReferences(
+    id_user: number,
+    registered_by: number | null,
+  ) {
     const athlete = await this.usersService.findOneById(id_user)
     if (!athlete)
       throw new BadRequestException({
@@ -27,8 +34,11 @@ export class HealthRecordsService {
         mensaje: 'No existe el deportista indicado',
       })
 
-    const registeredByUser = await this.usersService.findOneById(registered_by)
-    if (!registeredByUser)
+    const registeredByUser =
+      registered_by === null
+        ? null
+        : await this.usersService.findOneById(registered_by)
+    if (registered_by !== null && !registeredByUser)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'No existe el usuario que registra el dato de salud',
@@ -64,8 +74,7 @@ export class HealthRecordsService {
       .skip((page - 1) * limit)
       .take(limit)
 
-    if (id_user)
-      query.andWhere('health_record.id_user = :id_user', { id_user })
+    if (id_user) query.andWhere('health_record.id_user = :id_user', { id_user })
     if (status) query.andWhere('health_record.status = :status', { status })
 
     const [records, total] = await query.getManyAndCount()
@@ -112,7 +121,10 @@ export class HealthRecordsService {
     return this.getById(record.id_health)
   }
 
-  async update(id_health: number, updateHealthRecordDto: UpdateHealthRecordDto) {
+  async update(
+    id_health: number,
+    updateHealthRecordDto: UpdateHealthRecordDto,
+  ) {
     const record = await this.findOneById(id_health)
     if (!record)
       throw new NotFoundException({

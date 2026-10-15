@@ -26,8 +26,8 @@ export class WeightedProgressIndex {
   @Column()
   id_season: number
 
-  @Column()
-  id_profile: number
+  @Column({ type: 'int', nullable: true })
+  id_profile: number | null
 
   @Column({ type: 'decimal', precision: 5, scale: 2 })
   physical_score: number
@@ -50,7 +50,7 @@ export class WeightedProgressIndex {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
@@ -58,7 +58,10 @@ export class WeightedProgressIndex {
   @JoinColumn({ name: 'id_season' })
   season: Season
 
-  @ManyToOne(() => PositionWeightProfile)
+  @ManyToOne(() => PositionWeightProfile, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'id_profile' })
   profile: PositionWeightProfile
 }

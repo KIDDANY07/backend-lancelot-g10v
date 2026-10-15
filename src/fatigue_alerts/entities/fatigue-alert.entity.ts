@@ -60,7 +60,7 @@ export class FatigueAlert {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 }

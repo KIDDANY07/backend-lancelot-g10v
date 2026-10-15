@@ -1,6 +1,14 @@
 import { Season } from 'src/seasons/entities/season.entity'
 import { User } from 'src/users/entities/user.entity'
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, } from 'typeorm'
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm'
 
 export enum PhysicalEvaluationStage {
   PRE = 'pre',
@@ -55,7 +63,7 @@ export class PhysicalEvaluation {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
@@ -63,7 +71,7 @@ export class PhysicalEvaluation {
   @JoinColumn({ name: 'id_season' })
   season: Season
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'evaluator_id' })
   evaluator?: User | null
 }

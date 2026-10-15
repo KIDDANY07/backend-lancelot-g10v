@@ -215,12 +215,16 @@ export class UsersController {
   @Delete('id/:id')
   @ApiOperation({
     summary: 'Eliminar un usuario',
-    description: 'Requiere rol ADMIN.',
+    description:
+      'Requiere rol ADMIN. Elimina la cuenta y todos los datos del deportista (asignaciones, cargas, evaluaciones, salud, alertas, índices y sesiones). En los registros que la persona hizo sobre otros deportistas, el autor queda vacío. No permite eliminar la cuenta propia ni el único administrador.',
   })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiOkResponse({ type: UserResponseDto })
   @ApiNotFoundResponse({ description: 'El usuario no existe.' })
-  delete(@Param('id', ParseIntPipe) id_user: number) {
-    return this.usersService.delete(id_user)
+  delete(
+    @Param('id', ParseIntPipe) id_user: number,
+    @GetUser('id_user') requested_by: number,
+  ) {
+    return this.usersService.delete(id_user, requested_by)
   }
 }

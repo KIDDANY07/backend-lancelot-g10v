@@ -40,8 +40,8 @@ export class DevelopmentObjective {
   })
   status: DevelopmentObjectiveStatus
 
-  @Column()
-  set_by: number
+  @Column({ type: 'int', nullable: true })
+  set_by: number | null
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
@@ -49,7 +49,7 @@ export class DevelopmentObjective {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
@@ -57,7 +57,7 @@ export class DevelopmentObjective {
   @JoinColumn({ name: 'id_season' })
   season: Season
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'set_by' })
   setByUser: User
 }

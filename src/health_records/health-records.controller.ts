@@ -121,13 +121,13 @@ export class HealthRecordsController {
     @Param('id', ParseIntPipe) id_health: number,
     @GetUser('id_user') id_accessing_user: number,
   ) {
-    const result = await this.healthRecordsService.delete(id_health)
+    await this.healthRecordsService.getById(id_health)
     await this.healthRecordAuditService.log(
       HealthRecordAccessAction.DELETE,
       id_accessing_user,
       id_health,
     )
-    return result
+    return this.healthRecordsService.delete(id_health)
   }
 
   @Roles('ADMIN')

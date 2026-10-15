@@ -36,11 +36,11 @@ export class TrainingLoad {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => TrainingSession)
+  @ManyToOne(() => TrainingSession, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_session' })
   session: TrainingSession
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 }

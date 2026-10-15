@@ -26,12 +26,14 @@ export class TechnicalEvaluationsService {
   private async validateReferences(
     id_user: number,
     id_season: number,
-    evaluator_id: number,
+    evaluator_id: number | null,
   ) {
     const [athlete, season, evaluator] = await Promise.all([
       this.usersService.findOneById(id_user),
       this.seasonsService.findOneById(id_season),
-      this.usersService.findOneById(evaluator_id),
+      evaluator_id === null
+        ? null
+        : this.usersService.findOneById(evaluator_id),
     ])
     if (!athlete)
       throw new BadRequestException({
@@ -43,7 +45,7 @@ export class TechnicalEvaluationsService {
         status: 'Error',
         mensaje: 'No existe la temporada indicada',
       })
-    if (!evaluator)
+    if (evaluator_id !== null && !evaluator)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'No existe el evaluador indicado',

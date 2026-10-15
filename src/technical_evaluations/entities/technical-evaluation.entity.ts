@@ -27,8 +27,8 @@ export class TechnicalEvaluation {
   @Column({ type: 'decimal', precision: 3, scale: 1 })
   score: number
 
-  @Column()
-  evaluator_id: number
+  @Column({ type: 'int', nullable: true })
+  evaluator_id: number | null
 
   @Column({ type: 'date' })
   eval_date: string
@@ -39,7 +39,7 @@ export class TechnicalEvaluation {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
@@ -47,7 +47,7 @@ export class TechnicalEvaluation {
   @JoinColumn({ name: 'id_season' })
   season: Season
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'evaluator_id' })
   evaluator: User
 }

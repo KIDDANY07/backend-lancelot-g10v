@@ -21,17 +21,22 @@ export class InjuriesService {
     private readonly usersService: UsersService,
   ) {}
 
-  private async validateReferences(id_user: number, registered_by: number) {
+  private async validateReferences(
+    id_user: number,
+    registered_by: number | null,
+  ) {
     const [athlete, registeredByUser] = await Promise.all([
       this.usersService.findOneById(id_user),
-      this.usersService.findOneById(registered_by),
+      registered_by === null
+        ? null
+        : this.usersService.findOneById(registered_by),
     ])
     if (!athlete)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'No existe el deportista indicado',
       })
-    if (!registeredByUser)
+    if (registered_by !== null && !registeredByUser)
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'No existe el usuario que registra la lesión',

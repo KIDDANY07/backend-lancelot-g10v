@@ -62,8 +62,8 @@ export class Injury {
   @Column({ type: 'int', nullable: true })
   time_loss_days?: number | null
 
-  @Column()
-  registered_by: number
+  @Column({ type: 'int', nullable: true })
+  registered_by: number | null
 
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
@@ -71,11 +71,11 @@ export class Injury {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'registered_by' })
   registeredByUser: User
 }

@@ -27,11 +27,17 @@ export class AthletesInCompetency {
   @UpdateDateColumn({ type: 'timestamptz' })
   updated_at: Date
 
-  @ManyToOne(() => User, (user) => user.athletesInCompetency)
+  @ManyToOne(() => User, (user) => user.athletesInCompetency, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'id_user' })
   user: User
 
-  @ManyToOne(() => Competency, (competency) => competency.athletesInCompetencyc)
+  @ManyToOne(
+    () => Competency,
+    (competency) => competency.athletesInCompetencyc,
+    { onDelete: 'CASCADE' },
+  )
   @JoinColumn({ name: 'id_competency' })
   competency: Competency
 }

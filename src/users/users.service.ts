@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -314,14 +315,31 @@ export class UsersService {
     return { status: 'Success', mensaje: 'Contraseña actualizada con exito' }
   }
 
-  async delete(id_user: number) {
+  async delete(id_user: number, requested_by?: number) {
     const user = await this.findOneById(id_user)
     if (!user)
       throw new NotFoundException({
         status: 'Error',
         mensaje: 'No existe este usuario',
       })
-    await this.usersRepository.remove(user)
+    if (requested_by === id_user)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje:
+          'No puedes eliminar tu propia cuenta. Pídele a otro administrador que lo haga.',
+      })
+    if (user.id_role === ROLE_IDS.ADMIN) {
+      const admins = await this.usersRepository.count({
+        where: { id_role: ROLE_IDS.ADMIN },
+      })
+      if (admins <= 1)
+        throw new ConflictException({
+          status: 'Error',
+          mensaje:
+            'No se puede eliminar el único administrador del club. Crea otro administrador antes de eliminar esta cuenta.',
+        })
+    }
+    await this.usersRepository.delete(id_user)
     return {
       status: 'Success',
       mensaje: 'Usuario eliminado con exito',

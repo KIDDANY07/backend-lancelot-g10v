@@ -6,6 +6,10 @@ import { Category } from './entities/category.entity'
 import { Repository } from 'typeorm'
 import { FilterCategory } from './dto/filter-category.dto'
 import { plainToInstance } from 'class-transformer'
+import {
+  assertNoReferences,
+  countReferences,
+} from 'src/common/utils/delete-guard.util'
 
 @Injectable()
 export class CategoriesService {
@@ -120,6 +124,41 @@ export class CategoriesService {
         status: 'Error',
         mensaje: 'No existe esta categoria',
       })
+    const references = await countReferences(
+      this.categoryRepository.manager,
+      [
+        {
+          table: 'athletes_in_categories',
+          column: 'id_category',
+          singular: 'asignación de deportista',
+          plural: 'asignaciones de deportistas',
+        },
+        {
+          table: 'competencies',
+          column: 'id_category',
+          singular: 'competencia',
+          plural: 'competencias',
+        },
+        {
+          table: 'matches',
+          column: 'id_category',
+          singular: 'partido',
+          plural: 'partidos',
+        },
+        {
+          table: 'training_sessions',
+          column: 'id_category',
+          singular: 'sesión de entrenamiento',
+          plural: 'sesiones de entrenamiento',
+        },
+      ],
+      id_category,
+    )
+    assertNoReferences(
+      `la categoría ${category.name}`,
+      references,
+      'Esa información forma parte del historial de los deportistas; conserva la categoría o elimina primero esos registros.',
+    )
     await this.categoryRepository.remove(category)
     return {
       status: 'Success',
