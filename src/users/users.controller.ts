@@ -16,6 +16,7 @@ import { FilterUserDto } from './dto/filter-user.dto'
 import { AdminCreateUserDto } from './dto/admin-create-user.dto'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto'
+import { AcceptDataPolicyDto } from './dto/accept-data-policy.dto'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -186,6 +187,28 @@ export class UsersController {
     @Body() updateMyProfileDto: UpdateMyProfileDto,
   ) {
     return this.usersService.updateProfile(id_user, updateMyProfileDto)
+  }
+
+  @Roles(
+    'ADMIN',
+    'ENTRENADOR',
+    'DIRECTOR_TECNICO',
+    'DEPORTISTA',
+    'ENCARGADO_SALUD',
+  )
+  @Put('me/data-policy')
+  @ApiOperation({
+    summary: 'Aceptar la política de tratamiento de datos',
+    description:
+      'Registra la fecha y la versión de la política que el usuario autenticado acepta (Ley 1581 de 2012). Disponible para todos los roles.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'No se aceptó la política.' })
+  acceptDataPolicy(
+    @GetUser('id_user') id_user: number,
+    @Body() { accept }: AcceptDataPolicyDto,
+  ) {
+    return this.usersService.acceptDataPolicy(id_user, accept)
   }
 
   @Roles('ADMIN')

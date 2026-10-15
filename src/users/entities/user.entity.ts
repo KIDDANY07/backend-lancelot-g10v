@@ -35,6 +35,12 @@ export class User {
   @Column({ type: 'date', nullable: true })
   birth_date?: string | null
 
+  @Column({ type: 'timestamptz', nullable: true })
+  data_policy_accepted_at?: Date | null
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  data_policy_version?: string | null
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
 

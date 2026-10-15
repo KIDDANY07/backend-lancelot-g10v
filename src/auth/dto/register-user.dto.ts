@@ -1,4 +1,12 @@
-import { IsDateString, IsEmail, IsNotEmpty, IsOptional, IsString, Length, } from 'class-validator'
+import {
+  Equals,
+  IsBoolean,
+  IsDateString,
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Length,
+} from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class RegisterUserDto {
@@ -56,4 +64,16 @@ export class RegisterUserDto {
     format: 'date',
   })
   birth_date: string
+
+  @IsBoolean()
+  @Equals(true, {
+    message:
+      'Debes aceptar la política de tratamiento de datos para crear la cuenta',
+  })
+  @ApiProperty({
+    description:
+      'Autorización expresa del titular para el tratamiento de sus datos personales (Ley 1581 de 2012).',
+    example: true,
+  })
+  accept_data_policy: boolean
 }

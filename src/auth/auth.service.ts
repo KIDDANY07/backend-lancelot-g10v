@@ -81,8 +81,8 @@ export class AuthService {
   }
 
   async register(registerUserDto: RegisterUserDto) {
-    const user = await this.usersService.create(registerUserDto)
-    return user
+    const { accept_data_policy, ...data } = registerUserDto
+    return this.usersService.create(data, accept_data_policy)
   }
 
   async login(loginUserDto: LoginUserDto, ip?: string, userAgent?: string) {

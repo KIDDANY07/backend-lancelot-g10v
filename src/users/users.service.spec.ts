@@ -4,6 +4,7 @@ import { Repository } from 'typeorm'
 import { Role } from 'src/roles/entities/role.entity'
 import { User } from './entities/user.entity'
 import { UsersService } from './users.service'
+import { DATA_POLICY_VERSION } from 'src/common/utils/data-policy.util'
 
 jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
@@ -133,6 +134,66 @@ describe('UsersService', () => {
       expect(changes.name).toBe('Juan')
       expect(changes.id_role).toBeUndefined()
       expect(changes.password).toBeUndefined()
+    })
+  })
+
+  describe('data policy', () => {
+    it('stores the acceptance date and version when the athlete registers', async () => {
+      const { service, usersRepository } = buildService()
+      const result = await service.create(
+        {
+          name: 'Ana',
+          lastname: 'Pérez',
+          email: 'ana@club.co',
+          password: 'secreta1',
+          birth_date: '2010-04-12',
+        },
+        true,
+      )
+
+      const [saved] = usersRepository.save.mock.calls[0]
+      expect(saved.data_policy_version).toBe(DATA_POLICY_VERSION)
+      expect(saved.data_policy_accepted_at).toBeInstanceOf(Date)
+      expect(result.user.data_policy_pending).toBe(false)
+    })
+
+    it('marks the policy as pending for accounts created without it', async () => {
+      const { service, usersRepository } = buildService()
+      const result = await service.create({
+        name: 'Ana',
+        lastname: 'Pérez',
+        email: 'ana@club.co',
+        password: 'secreta1',
+        birth_date: '2010-04-12',
+      })
+
+      const [saved] = usersRepository.save.mock.calls[0]
+      expect(saved.data_policy_accepted_at).toBeUndefined()
+      expect(result.user.data_policy_pending).toBe(true)
+    })
+
+    it('records the acceptance of a user that was pending', async () => {
+      const { service, usersRepository } = buildService({
+        id_user: 5,
+        email: 'a@b.co',
+      })
+      await service.acceptDataPolicy(5, true)
+
+      const [, changes] = usersRepository.update.mock.calls[0] as [
+        number,
+        Partial<User>,
+      ]
+      expect(changes.data_policy_version).toBe(DATA_POLICY_VERSION)
+      expect(changes.data_policy_accepted_at).toBeInstanceOf(Date)
+    })
+
+    it('rejects a request that does not accept the policy', async () => {
+      const { service, usersRepository } = buildService({ id_user: 5 })
+
+      await expect(service.acceptDataPolicy(5, false)).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      expect(usersRepository.update).not.toHaveBeenCalled()
     })
   })
 

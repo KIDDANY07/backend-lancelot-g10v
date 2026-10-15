@@ -17,6 +17,7 @@ import { Role } from 'src/roles/entities/role.entity'
 import { AdminCreateUserDto } from './dto/admin-create-user.dto'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto'
+import { dataPolicyAcceptance } from 'src/common/utils/data-policy.util'
 
 @Injectable()
 export class UsersService {
@@ -164,7 +165,7 @@ export class UsersService {
     }
   }
 
-  async create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto, acceptedDataPolicy = false) {
     const existsEmail = await this.findOneByEmail(createUserDto.email)
     if (existsEmail)
       throw new BadRequestException({
@@ -177,6 +178,7 @@ export class UsersService {
       ...createUserDto,
       password: hashedPassword,
       id_role: id_role,
+      ...(acceptedDataPolicy ? dataPolicyAcceptance() : {}),
     })
     return {
       status: 'Success',
@@ -184,6 +186,27 @@ export class UsersService {
       user: plainToInstance(ResponseUserDto, user, {
         excludeExtraneousValues: true,
       }),
+    }
+  }
+
+  async acceptDataPolicy(id_user: number, accept: boolean) {
+    if (!accept)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje:
+          'Debes aceptar la política de tratamiento de datos para usar la plataforma',
+      })
+    const user = await this.findOneById(id_user)
+    if (!user)
+      throw new NotFoundException({
+        status: 'Error',
+        mensaje: 'No existe este usuario',
+      })
+    await this.usersRepository.update(id_user, dataPolicyAcceptance())
+    const updated = await this.getById(id_user)
+    return {
+      ...updated,
+      mensaje: 'Autorización de tratamiento de datos registrada',
     }
   }
 
