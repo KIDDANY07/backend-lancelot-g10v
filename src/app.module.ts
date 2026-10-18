@@ -33,6 +33,7 @@ import { TalentRuleConfigModule } from './talent_rule_config/talent-rule-config.
 import { MlFeaturesModule } from './ml_features/ml-features.module'
 import { MlEngineModule } from './ml_engine/ml-engine.module'
 import { AlertInboxModule } from './alert_inbox/alert-inbox.module'
+import { SeasonPlanningModule } from './season_planning/season-planning.module'
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { AlertInboxModule } from './alert_inbox/alert-inbox.module'
     MlFeaturesModule,
     MlEngineModule,
     AlertInboxModule,
+    SeasonPlanningModule,
   ],
   controllers: [],
   providers: [],

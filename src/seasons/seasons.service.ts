@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { plainToInstance } from 'class-transformer'
-import { LessThan, Repository } from 'typeorm'
+import { LessThan, MoreThan, Repository } from 'typeorm'
 import { CreateSeasonDto } from './dto/create-season.dto'
 import { FilterSeasonDto } from './dto/filter-season.dto'
 import { ResponseSeasonDto } from './dto/response-season.dto'
@@ -56,6 +56,13 @@ export class SeasonsService {
     return this.seasonsRepository.findOne({
       where: { start_date: LessThan(season.start_date) },
       order: { start_date: 'DESC', id_season: 'DESC' },
+    })
+  }
+
+  async findNext(season: Season) {
+    return this.seasonsRepository.findOne({
+      where: { start_date: MoreThan(season.start_date) },
+      order: { start_date: 'ASC', id_season: 'ASC' },
     })
   }
 
