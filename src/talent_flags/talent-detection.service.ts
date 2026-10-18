@@ -7,6 +7,11 @@ import { Category } from 'src/categories/entities/category.entity'
 import { ScopedConfigCache } from 'src/common/scoped_config/scoped-config'
 import { extractErrorMessage } from 'src/common/utils/error-message.util'
 import { Injury, InjurySeverity } from 'src/injuries/entities/injury.entity'
+import {
+  TalentInferenceService,
+  TalentInferenceSummary,
+} from 'src/ml_engine/talent-inference.service'
+import { TalentFeaturesService } from 'src/ml_features/talent-features.service'
 import { SeasonsService } from 'src/seasons/seasons.service'
 import { TalentRuleConfigService } from 'src/talent_rule_config/talent-rule-config.service'
 import { WeightedProgressIndex } from 'src/weighted_progress_index/entities/weighted-progress-index.entity'
@@ -39,7 +44,24 @@ export class TalentDetectionService {
     private readonly progressIndexCalculatorService: ProgressIndexCalculatorService,
     private readonly talentRuleConfigService: TalentRuleConfigService,
     private readonly talentDetectionRulesService: TalentDetectionRulesService,
+    private readonly talentFeaturesService: TalentFeaturesService,
+    private readonly talentInferenceService: TalentInferenceService,
   ) {}
+
+  private async runTalentModel(
+    id_season: number,
+  ): Promise<TalentInferenceSummary | { error: string }> {
+    try {
+      await this.talentFeaturesService.rebuild()
+      return await this.talentInferenceService.runForSeason(id_season)
+    } catch (error) {
+      const mensaje = extractErrorMessage(error)
+      this.logger.error(
+        `Error en el modelo de talento de la temporada ${id_season}: ${mensaje}`,
+      )
+      return { error: mensaje }
+    }
+  }
 
   async detectForSeason(id_season: number) {
     const season = await this.seasonsService.findOneById(id_season)
@@ -207,6 +229,7 @@ export class TalentDetectionService {
     this.logger.log(
       `Detección de talento de la temporada ${id_season}: ${evaluated} evaluados, ${flagged} señalados`,
     )
+    const ml = await this.runTalentModel(id_season)
 
     return {
       status: 'Success',
@@ -222,6 +245,7 @@ export class TalentDetectionService {
         recalculated: recalculation.recalculated,
         failed: recalculation.failed,
       },
+      ml,
     }
   }
 }

@@ -27,6 +27,10 @@ export enum TalentFlagSource {
   unique: true,
   where: "source = 'rules'",
 })
+@Index('UQ_talent_flags_ml_user_season', ['id_user', 'id_season'], {
+  unique: true,
+  where: "source = 'ml'",
+})
 @Entity('talent_flags')
 export class TalentFlag {
   @PrimaryGeneratedColumn()

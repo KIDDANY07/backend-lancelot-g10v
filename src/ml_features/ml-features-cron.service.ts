@@ -4,6 +4,7 @@ import { todayKey } from 'src/common/utils/date.util'
 import { extractErrorMessage } from 'src/common/utils/error-message.util'
 import { MlInferenceService } from 'src/ml_engine/ml-inference.service'
 import { MlFeaturesService } from './ml-features.service'
+import { TalentFeaturesService } from './talent-features.service'
 
 @Injectable()
 export class MlFeaturesCronService {
@@ -12,6 +13,7 @@ export class MlFeaturesCronService {
   constructor(
     private readonly mlFeaturesService: MlFeaturesService,
     private readonly mlInferenceService: MlInferenceService,
+    private readonly talentFeaturesService: TalentFeaturesService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_5AM)
@@ -52,6 +54,14 @@ export class MlFeaturesCronService {
     } catch (error) {
       this.logger.error(
         `Error en el etiquetado retroactivo: ${extractErrorMessage(error)}`,
+      )
+    }
+
+    try {
+      await this.talentFeaturesService.rebuild()
+    } catch (error) {
+      this.logger.error(
+        `Error al reconstruir el dataset de talento: ${extractErrorMessage(error)}`,
       )
     }
   }

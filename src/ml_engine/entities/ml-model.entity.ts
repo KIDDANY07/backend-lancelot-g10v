@@ -7,6 +7,11 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 
+export enum MlModelTask {
+  INJURY_RISK = 'injury_risk',
+  TALENT = 'talent',
+}
+
 export interface MlModelMetrics {
   roc_auc?: number | null
   pr_auc?: number | null
@@ -19,7 +24,7 @@ export interface MlModelMetrics {
 }
 
 @Index('UQ_ml_models_version', ['version'], { unique: true })
-@Index('UQ_ml_models_active', ['is_active'], {
+@Index('UQ_ml_models_active_task', ['task'], {
   unique: true,
   where: 'is_active = true',
 })
@@ -30,6 +35,9 @@ export class MlModel {
 
   @Column({ length: 50 })
   version: string
+
+  @Column({ type: 'enum', enum: MlModelTask, default: MlModelTask.INJURY_RISK })
+  task: MlModelTask
 
   @Column({ length: 50 })
   algorithm: string

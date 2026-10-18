@@ -51,6 +51,30 @@ export function checkCategoryEligibility(
   return { eligible: true, sportingAge: age }
 }
 
+export interface CategoryAgeRange {
+  min_age: number
+  max_age: number
+}
+
+export function eligibleCategoriesFor<T extends CategoryAgeRange>(
+  age: number,
+  categories: T[],
+): T[] {
+  return categories
+    .filter((category) => category.max_age >= age)
+    .sort((a, b) => a.max_age - b.max_age || a.min_age - b.min_age)
+}
+
+export function naturalCategoryFor<T extends CategoryAgeRange>(
+  age: number,
+  categories: T[],
+): T | null {
+  const eligible = eligibleCategoriesFor(age, categories)
+  return (
+    eligible.find((category) => category.min_age <= age) ?? eligible[0] ?? null
+  )
+}
+
 export function pickBaseAssignments<
   T extends { id_user: number; id_category: number; id_ath_cat?: number },
 >(

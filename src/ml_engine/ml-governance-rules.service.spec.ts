@@ -197,4 +197,34 @@ describe('MlGovernanceRulesService', () => {
       expect(reasons).toHaveLength(4)
     })
   })
+
+  describe('evaluateTalentReadiness', () => {
+    const minimums = {
+      talent_min_seasons: 2,
+      talent_min_promotions: 10,
+      talent_min_athletes: 30,
+    }
+
+    it('is ready with two labeled seasons, enough promotions and athletes', () => {
+      const result = service.evaluateTalentReadiness(
+        { labeled_seasons: 2, promotions: 12, athletes: 40 },
+        minimums,
+      )
+      expect(result.ready).toBe(true)
+      expect(result.criteria.map((criterion) => criterion.code)).toEqual([
+        'temporadas_etiquetadas',
+        'ascensos',
+        'deportistas',
+      ])
+    })
+
+    it('is not ready with a single labeled season', () => {
+      const result = service.evaluateTalentReadiness(
+        { labeled_seasons: 1, promotions: 12, athletes: 40 },
+        minimums,
+      )
+      expect(result.ready).toBe(false)
+      expect(result.criteria[0].met).toBe(false)
+    })
+  })
 })

@@ -6,6 +6,20 @@ export enum ReadinessCriterionCode {
   LABELED_DAYS = 'dias_etiquetados',
   NON_CONTACT_INJURIES = 'lesiones_sin_contacto',
   ATHLETES = 'deportistas',
+  LABELED_SEASONS = 'temporadas_etiquetadas',
+  PROMOTIONS = 'ascensos',
+}
+
+export interface TalentReadinessStats {
+  labeled_seasons: number
+  promotions: number
+  athletes: number
+}
+
+export interface TalentReadinessMinimums {
+  talent_min_seasons: number
+  talent_min_promotions: number
+  talent_min_athletes: number
 }
 
 export interface ReadinessStats {
@@ -72,6 +86,38 @@ export class MlGovernanceRulesService {
         descripcion: 'Deportistas distintos con snapshots etiquetados',
         value: stats.athletes,
         minimum: Number(minimums.min_athletes),
+      },
+    ].map((criterion) => ({
+      ...criterion,
+      met: criterion.value >= criterion.minimum,
+    }))
+    return { ready: criteria.every((c) => c.met), criteria }
+  }
+
+  evaluateTalentReadiness(
+    stats: TalentReadinessStats,
+    minimums: TalentReadinessMinimums,
+  ): ReadinessResult {
+    const criteria: ReadinessCriterion[] = [
+      {
+        code: ReadinessCriterionCode.LABELED_SEASONS,
+        descripcion:
+          'Temporadas con la etiqueta de ascenso real (una para entrenar y otra para probar)',
+        value: stats.labeled_seasons,
+        minimum: Number(minimums.talent_min_seasons),
+      },
+      {
+        code: ReadinessCriterionCode.PROMOTIONS,
+        descripcion:
+          'Ascensos reales: deportistas que la temporada siguiente jugaron en una categoría superior a la de su edad',
+        value: stats.promotions,
+        minimum: Number(minimums.talent_min_promotions),
+      },
+      {
+        code: ReadinessCriterionCode.ATHLETES,
+        descripcion: 'Deportistas distintos con temporadas etiquetadas',
+        value: stats.athletes,
+        minimum: Number(minimums.talent_min_athletes),
       },
     ].map((criterion) => ({
       ...criterion,

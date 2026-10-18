@@ -1,8 +1,11 @@
 # Lancelot ML: microservicio de la fase 2
 
-Microservicio en Python (FastAPI y scikit-learn) que entrena y sirve el modelo de aprendizaje automático para estimar el **riesgo de lesión sin contacto**. Es la fase 2 del módulo de apoyo a la decisión del backend Lancelot.
+Microservicio en Python (FastAPI y scikit-learn) que entrena y sirve dos modelos de aprendizaje automático del módulo de apoyo a la decisión del backend Lancelot:
 
-La fase 2 está **condicionada a tener al menos una temporada completa de datos etiquetados** (Rossi et al., 2018; Van Eetvelde et al., 2021). Mientras no se cumpla, el backend sigue funcionando solo con las reglas de la fase 1.
+- el de **riesgo de lesión sin contacto** (fase 2 del riesgo);
+- el de **potencial de ascenso** (fase 2 de la detección de talento), que aprende de los ascensos reales del club.
+
+Cada modelo está **condicionado a su propia readiness**: el de riesgo, a una temporada completa de datos diarios etiquetados (Rossi et al., 2018; Van Eetvelde et al., 2021); el de talento, a dos temporadas con ascensos reales etiquetados. Mientras no se cumpla, el backend sigue funcionando solo con las reglas.
 
 > ⚠️ **Datos sintéticos.** Las métricas que se obtienen con datos sintéticos (`scripts/generate_synthetic.py`) **no representan el desempeño real del modelo y no deben reportarse como resultados** del trabajo de grado. Esos datos solo sirven para comprobar que el pipeline funciona de extremo a extremo. Los modelos entrenados con datos sintéticos o insuficientes quedan registrados con `is_synthetic = true`, y el backend **nunca** permite activarlos.
 
@@ -16,13 +19,20 @@ La fase 2 está **condicionada a tener al menos una temporada completa de datos 
    - que el modelo supere a las reglas en PR-AUC.
 4. Con el motor en modo `shadow` o `ml`, el backend llama a `POST /predict` cada día. Si este servicio falla, el backend sigue con las reglas.
 
+### Modelo de talento
+
+1. El backend reconstruye cada noche, y cada vez que detecta talento, la tabla `athlete_season_features`: una fila por deportista y temporada con su índice de progreso, su percentil, sus dimensiones y su contexto de edad.
+2. La etiqueta `label_promoted` es el **ascenso real**: que la temporada siguiente el deportista juegue en una categoría superior a la que le corresponde por edad. Se etiqueta cuando la temporada siguiente ya tiene plantilla; quien no sigue en el club queda excluido.
+3. Cuando se cumple `GET /api/ml/talent-readiness`, se llama a `POST /talent/train`. Entrena con las temporadas anteriores, prueba con la última etiquetada, compara con las reglas de talento y registra el modelo con `task = talent`.
+4. Activado el modelo y con el motor de talento en `shadow` o `ml`, el backend llama a `POST /talent/predict` al detectar talento de una temporada.
+
 ## Configuración
 
 Copie `.env.example` a `.env` y complete los valores:
 
 | Variable | Descripción |
 |---|---|
-| `DATABASE_URL` | Conexión de **solo lectura** a PostgreSQL. Solo se consulta la tabla `athlete_daily_features`. Se recomienda un usuario con permiso `SELECT` únicamente sobre esa tabla. |
+| `DATABASE_URL` | Conexión de **solo lectura** a PostgreSQL. Solo se consultan las tablas `athlete_daily_features` y `athlete_season_features`. Se recomienda un usuario con permiso `SELECT` únicamente sobre ellas. |
 | `BACKEND_URL` | URL base del backend Nest, sin `/api`. |
 | `ML_SERVICE_API_KEY` | La misma clave que `ML_SERVICE_API_KEY` en el backend. Se usa en la cabecera `x-api-key` en ambos sentidos. |
 | `MODELS_DIR` | Carpeta donde se guardan los modelos entrenados (`.joblib`). |
@@ -34,7 +44,7 @@ Ejemplo de usuario de solo lectura:
 CREATE ROLE lancelot_ml_readonly LOGIN PASSWORD '...';
 GRANT CONNECT ON DATABASE lancelot TO lancelot_ml_readonly;
 GRANT USAGE ON SCHEMA public TO lancelot_ml_readonly;
-GRANT SELECT ON athlete_daily_features TO lancelot_ml_readonly;
+GRANT SELECT ON athlete_daily_features, athlete_season_features TO lancelot_ml_readonly;
 ```
 
 ## Ejecución local
@@ -64,9 +74,11 @@ docker run --env-file ml-service/.env -p 8000:8000 -v lancelot-models:/app/model
 
 | Método | Ruta | Protección | Descripción |
 |---|---|---|---|
-| GET | `/health` | Ninguna | Estado del servicio y modelo cargado. |
+| GET | `/health` | Ninguna | Estado del servicio y de los modelos cargados (riesgo y talento). |
 | POST | `/predict` | `x-api-key` | Recibe `{ model_version, features }` y devuelve `{ probability, top_factors: [{ feature, contribution }], model_version }`. |
 | POST | `/train` | `x-api-key` | Recibe `{ source: "db" \| "csv", csv_path, allow_insufficient_data }`. Entrena, guarda y registra el modelo. |
+| POST | `/talent/predict` | `x-api-key` | Igual que `/predict`, con las variables del dataset de talento y el modelo de talento activo. |
+| POST | `/talent/train` | `x-api-key` | Igual que `/train`, contra la readiness y el dataset de talento. |
 
 `/predict` solo recibe variables numéricas del snapshot. El backend aplica una lista blanca, así que nunca llegan nombres, correos, fechas de nacimiento ni `id_user`, de acuerdo con la Ley 1581 de 2012.
 
@@ -98,6 +110,14 @@ docker run --env-file ml-service/.env -p 8000:8000 -v lancelot-models:/app/model
 
 `rules_risk_level` no se usa como variable: se reserva para la comparación con la fase 1.
 
+### Modelo de talento (`feature_version = t1`)
+
+- **Partición por temporada:** la última temporada etiquetada es el conjunto de prueba y las anteriores, el de entrenamiento. Por eso se necesitan al menos dos.
+- **Mismos candidatos, selección y métricas** que el modelo de riesgo.
+- **Línea base de reglas:** `rules_flagged`, es decir, si las reglas de talento señalaron al deportista esa temporada.
+- **Variables:** `age_years`, `birth_quarter`, `years_to_category_max`, `plays_up`, `seasons_in_club`, `cohort_size`, `index_value`, `index_percentile`, `physical_score`, `technical_score`, `tactical_score` (solo si su perfil pondera la táctica), `participation_score`, `contribution_score`, `index_delta`, `injuries_in_season` y `severe_injury`.
+- **Versión:** empieza por `talento-`.
+
 ## Probar el pipeline con datos sintéticos
 
 ```bash
@@ -106,6 +126,8 @@ curl -X POST http://localhost:8000/train \
   -H "x-api-key: <clave>" -H "Content-Type: application/json" \
   -d '{"source": "csv", "csv_path": "data/synthetic_features.csv", "allow_insufficient_data": true}'
 ```
+
+Para el modelo de talento, `python scripts/generate_synthetic.py --task talent --seasons 4` genera un CSV de cuatro temporadas y se entrena con `POST /talent/train`.
 
 El script nunca escribe en la base de datos. El modelo resultante queda registrado como sintético y **no puede activarse**. Recuerde que **sus métricas no son resultados reportables**.
 
@@ -121,4 +143,5 @@ Cubren:
 - la selección por PR-AUC y la línea base de reglas;
 - la explicabilidad de ambos modelos;
 - la forma de la salida de `/predict`;
-- el rechazo de `/train` sin datos suficientes.
+- el rechazo de `/train` sin datos suficientes;
+- en talento: la lista blanca de variables, la partición por temporada, la línea base de reglas, el registro con `task = talent` y los endpoints `/talent/*`.

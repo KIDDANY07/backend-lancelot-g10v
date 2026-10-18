@@ -4,6 +4,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 from app.features import FEATURE_VERSION, FEATURES
+from app.talent_features import TALENT_FEATURE_VERSION, TALENT_FEATURES
 
 DATASET_COLUMNS = [
     "date",
@@ -24,6 +25,40 @@ DATASET_QUERY = text(
     ORDER BY date
     """
 )
+
+
+TALENT_DATASET_COLUMNS = [
+    "season_start",
+    *TALENT_FEATURES,
+    "rules_flagged",
+    "label_promoted",
+    "label_quality",
+    "feature_version",
+]
+
+TALENT_DATASET_QUERY = text(
+    f"""
+    SELECT {", ".join(TALENT_DATASET_COLUMNS)}
+    FROM athlete_season_features
+    WHERE label_quality = 'labeled'
+      AND feature_version = :feature_version
+    ORDER BY season_start
+    """
+)
+
+
+def _read_only(database_url: str, query, feature_version: str) -> pd.DataFrame:
+    engine = create_engine(database_url, pool_pre_ping=True)
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+            return pd.read_sql(query, connection, params={"feature_version": feature_version})
+    finally:
+        engine.dispose()
+
+
+def load_talent_dataset_from_db(database_url: str) -> pd.DataFrame:
+    return _read_only(database_url, TALENT_DATASET_QUERY, TALENT_FEATURE_VERSION)
 
 
 def load_dataset_from_db(database_url: str) -> pd.DataFrame:

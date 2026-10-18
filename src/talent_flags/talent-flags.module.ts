@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { AthletesInCategory } from 'src/athletes_in_categories/entities/athletes_in_category.entity'
 import { Category } from 'src/categories/entities/category.entity'
 import { Injury } from 'src/injuries/entities/injury.entity'
+import { MlEngineModule } from 'src/ml_engine/ml-engine.module'
+import { MlFeaturesModule } from 'src/ml_features/ml-features.module'
 import { SeasonsModule } from 'src/seasons/seasons.module'
 import { TalentRuleConfigModule } from 'src/talent_rule_config/talent-rule-config.module'
 import { UsersModule } from 'src/users/users.module'
@@ -28,6 +30,8 @@ import { TalentFlagsService } from './talent-flags.service'
     SeasonsModule,
     WeightedProgressIndexModule,
     TalentRuleConfigModule,
+    MlFeaturesModule,
+    MlEngineModule,
   ],
   controllers: [TalentFlagsController],
   providers: [

@@ -21,9 +21,15 @@ class ModelStore:
         self,
         models_dir: Callable[[], Path] = lambda: get_settings().models_dir,
         active_version: Callable[[], str | None] = backend_client.get_active_model_version,
+        feature_version: str = FEATURE_VERSION,
+        prepare: Callable[[pd.DataFrame], pd.DataFrame] = prepare_matrix,
+        label: str = "de riesgo de lesión",
     ) -> None:
         self._models_dir = models_dir
         self._active_version = active_version
+        self._feature_version = feature_version
+        self._prepare = prepare
+        self._label = label
         self._bundle: dict[str, Any] | None = None
         self._explainer: Any = None
         self._lock = threading.Lock()
@@ -39,10 +45,10 @@ class ModelStore:
                 f"El modelo activo {version} no está en el directorio de modelos"
             )
         bundle = joblib.load(path)
-        if bundle.get("feature_version") != FEATURE_VERSION:
+        if bundle.get("feature_version") != self._feature_version:
             raise ModelNotAvailable(
                 f"El modelo {version} usa variables {bundle.get('feature_version')} "
-                f"y el servicio espera {FEATURE_VERSION}"
+                f"y el servicio espera {self._feature_version}"
             )
         explainer = build_tree_explainer(bundle) if bundle["kind"] == "tree" else None
         self._bundle = bundle
@@ -54,7 +60,7 @@ class ModelStore:
             if version is None:
                 self._bundle = None
                 self._explainer = None
-                raise ModelNotAvailable("No hay un modelo de ML activo en el backend")
+                raise ModelNotAvailable(f"No hay un modelo de ML {self._label} activo en el backend")
             if version != self.version:
                 self.load_version(version)
 
@@ -71,7 +77,7 @@ class ModelStore:
         bundle = self._bundle
         if bundle is None:
             raise ModelNotAvailable("No hay un modelo de ML cargado")
-        row = prepare_matrix(pd.DataFrame([features]))
+        row = self._prepare(pd.DataFrame([features]))
         probability = float(bundle["model"].predict_proba(row)[0, 1])
         return {
             "probability": round(probability, 4),

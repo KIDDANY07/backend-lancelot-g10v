@@ -7,12 +7,19 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { plainToInstance } from 'class-transformer'
 import { Repository } from 'typeorm'
 import { FEATURE_VERSION } from 'src/ml_features/entities/athlete-daily-features.entity'
+import { TALENT_FEATURE_VERSION } from 'src/ml_features/entities/athlete-season-features.entity'
 import { CreateMlModelDto } from './dto/create-ml-model.dto'
 import { FilterMlModelDto } from './dto/filter-ml-model.dto'
 import { ResponseMlModelDto } from './dto/response-ml-model.dto'
-import { MlModel } from './entities/ml-model.entity'
+import { MlModel, MlModelTask } from './entities/ml-model.entity'
 import { MlGovernanceRulesService } from './ml-governance-rules.service'
 import { MlReadinessService } from './ml-readiness.service'
+import { TalentReadinessService } from './talent-readiness.service'
+
+const TASK_LABELS: Record<MlModelTask, string> = {
+  [MlModelTask.INJURY_RISK]: 'riesgo de lesión',
+  [MlModelTask.TALENT]: 'talento',
+}
 
 @Injectable()
 export class MlModelsService {
@@ -21,6 +28,7 @@ export class MlModelsService {
     private readonly mlModelsRepository: Repository<MlModel>,
     private readonly mlReadinessService: MlReadinessService,
     private readonly mlGovernanceRulesService: MlGovernanceRulesService,
+    private readonly talentReadinessService: TalentReadinessService,
   ) {}
 
   private toResponse(model: MlModel) {
@@ -29,8 +37,8 @@ export class MlModelsService {
     })
   }
 
-  async findActiveEntity() {
-    return this.mlModelsRepository.findOne({ where: { is_active: true } })
+  async findActiveEntity(task: MlModelTask = MlModelTask.INJURY_RISK) {
+    return this.mlModelsRepository.findOne({ where: { is_active: true, task } })
   }
 
   async create(createMlModelDto: CreateMlModelDto) {
@@ -44,6 +52,7 @@ export class MlModelsService {
       })
     const model = await this.mlModelsRepository.save({
       ...createMlModelDto,
+      task: createMlModelDto.task ?? MlModelTask.INJURY_RISK,
       rules_baseline_metrics: createMlModelDto.rules_baseline_metrics ?? null,
       notes: createMlModelDto.notes ?? null,
       is_active: false,
@@ -58,8 +67,9 @@ export class MlModelsService {
   }
 
   async findAll(filters: FilterMlModelDto) {
-    const { page = 1, limit = 10 } = filters
+    const { page = 1, limit = 10, task } = filters
     const [models, total] = await this.mlModelsRepository.findAndCount({
+      where: task ? { task } : {},
       order: { created_at: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -77,12 +87,12 @@ export class MlModelsService {
     }
   }
 
-  async getActive() {
-    const model = await this.findActiveEntity()
+  async getActive(task: MlModelTask = MlModelTask.INJURY_RISK) {
+    const model = await this.findActiveEntity(task)
     if (!model)
       throw new NotFoundException({
         status: 'Error',
-        mensaje: 'No hay un modelo de ML activo',
+        mensaje: `No hay un modelo de ML activo de ${TASK_LABELS[task]}`,
       })
     return {
       status: 'Success',
@@ -107,10 +117,15 @@ export class MlModelsService {
         model: this.toResponse(model),
       }
 
-    const readiness = await this.mlReadinessService.evaluate()
+    const isTalent = model.task === MlModelTask.TALENT
+    const readiness = isTalent
+      ? await this.talentReadinessService.evaluate()
+      : await this.mlReadinessService.evaluate()
     const reasons = this.mlGovernanceRulesService.checkModelActivation(model, {
       ready: readiness.ready,
-      currentFeatureVersion: FEATURE_VERSION,
+      currentFeatureVersion: isTalent
+        ? TALENT_FEATURE_VERSION
+        : FEATURE_VERSION,
     })
     if (reasons.length > 0)
       throw new BadRequestException({
@@ -119,13 +134,17 @@ export class MlModelsService {
       })
 
     await this.mlModelsRepository.manager.transaction(async (manager) => {
-      await manager.update(MlModel, { is_active: true }, { is_active: false })
+      await manager.update(
+        MlModel,
+        { is_active: true, task: model.task },
+        { is_active: false },
+      )
       await manager.update(MlModel, { id_model }, { is_active: true })
     })
     model.is_active = true
     return {
       status: 'Success',
-      mensaje: 'Modelo de ML activado con éxito',
+      mensaje: `Modelo de ML de ${TASK_LABELS[model.task]} activado con éxito`,
       model: this.toResponse(model),
     }
   }

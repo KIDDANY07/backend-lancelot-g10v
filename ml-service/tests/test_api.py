@@ -35,6 +35,9 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("MODELS_DIR", str(tmp_path))
     monkeypatch.setattr(backend_client, "get_active_model_version", lambda: None)
     monkeypatch.setattr(main, "store", ModelStore(models_dir=lambda: tmp_path, active_version=lambda: None))
+    monkeypatch.setattr(
+        main, "talent_store", ModelStore(models_dir=lambda: tmp_path, active_version=lambda: None)
+    )
     with TestClient(main.app) as test_client:
         yield test_client
 
@@ -55,7 +58,13 @@ def trained_version(synthetic_dataset, tmp_path, monkeypatch):
 def test_health_reports_no_model(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "model_loaded": False, "model_version": None}
+    assert response.json() == {
+        "status": "ok",
+        "model_loaded": False,
+        "model_version": None,
+        "talent_model_loaded": False,
+        "talent_model_version": None,
+    }
 
 
 def test_predict_requires_the_api_key(client):

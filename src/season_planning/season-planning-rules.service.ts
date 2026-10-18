@@ -1,4 +1,8 @@
 import { Injectable } from '@nestjs/common'
+import {
+  eligibleCategoriesFor,
+  naturalCategoryFor,
+} from 'src/common/utils/sport-age.util'
 
 export enum PlanFocusDimension {
   FISICA = 'fisica',
@@ -39,9 +43,7 @@ export interface FocusSuggestion {
 @Injectable()
 export class SeasonPlanningRulesService {
   eligibleCategories(age: number, categories: PlanCategoryInfo[]) {
-    return categories
-      .filter((category) => category.max_age >= age)
-      .sort((a, b) => a.max_age - b.max_age || a.min_age - b.min_age)
+    return eligibleCategoriesFor(age, categories)
   }
 
   suggestCategory(
@@ -56,14 +58,12 @@ export class SeasonPlanningRulesService {
         reason:
           'Sin fecha de nacimiento: registra la fecha para proponer su categoría',
       }
-    const eligible = this.eligibleCategories(age, categories)
-    if (eligible.length === 0)
+    const natural = naturalCategoryFor(age, categories)
+    if (!natural)
       return {
         category: null,
         reason: `Cumple ${age} años en ${referenceYear} y supera la edad máxima de todas las categorías del club`,
       }
-    const natural =
-      eligible.find((category) => category.min_age <= age) ?? eligible[0]
     if (current && current.max_age >= age && current.max_age >= natural.max_age)
       return {
         category: current,

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from app.features import FEATURE_VERSION
+from app.talent_features import TALENT_FEATURE_VERSION, TALENT_FEATURES
 
 EXPORT_COLUMNS = [
     "athlete_key",
@@ -163,3 +164,71 @@ def generate_synthetic_dataset(
     for athlete in range(athletes):
         rows.extend(_athlete_rows(rng, athlete, start, days))
     return pd.DataFrame(rows, columns=EXPORT_COLUMNS)
+
+
+TALENT_EXPORT_COLUMNS = [
+    "athlete_key",
+    "season_start",
+    *TALENT_FEATURES,
+    "rules_flagged",
+    "label_promoted",
+    "label_quality",
+    "feature_version",
+]
+
+
+def generate_talent_dataset(
+    athletes: int = 60,
+    seasons: int = 4,
+    first_season: int = 2023,
+    seed: int = 42,
+) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    rows: list[dict] = []
+    for athlete in range(athletes):
+        key = hashlib.sha256(f"talento-sintetico-{athlete}".encode()).hexdigest()[:16]
+        talent = rng.normal(0, 1)
+        birth_quarter = int(rng.integers(1, 5))
+        base_age = int(rng.integers(9, 15))
+        previous_index: float | None = None
+        plays_up = False
+        for season in range(seasons):
+            age = base_age + season
+            dims = np.clip(rng.normal(55 + 12 * talent, 12, 4), 0, 100)
+            index_value = float(np.clip(dims.mean() + rng.normal(0, 3), 0, 100))
+            percentile = float(np.clip(50 + 30 * talent + rng.normal(0, 12), 1, 100))
+            severe = bool(rng.random() < 0.05)
+            injuries = int(severe) + int(rng.poisson(0.3))
+            score = -2.4 + 1.6 * talent + 0.4 * (birth_quarter == 1) + 1.2 * plays_up - 1.0 * severe
+            promoted = bool(rng.random() < 1 / (1 + np.exp(-score)))
+            rules_flagged = percentile >= 80 and dims.min() >= 40
+            rows.append(
+                {
+                    "athlete_key": key,
+                    "season_start": f"{first_season + season}-02-01",
+                    "age_years": age,
+                    "birth_quarter": birth_quarter,
+                    "years_to_category_max": int(1 - (age % 2)),
+                    "plays_up": plays_up,
+                    "seasons_in_club": season,
+                    "cohort_size": 18,
+                    "index_value": round(index_value, 2),
+                    "index_percentile": round(percentile, 2),
+                    "physical_score": round(float(dims[0]), 2),
+                    "technical_score": round(float(dims[1]), 2),
+                    "tactical_score": round(float(dims[2]), 2),
+                    "participation_score": round(float(dims[3]), 2),
+                    "contribution_score": round(float(np.clip(percentile + rng.normal(0, 15), 0, 100)), 2),
+                    "index_delta": None if previous_index is None else round(index_value - previous_index, 2),
+                    "injuries_in_season": injuries,
+                    "severe_injury": severe,
+                    "rules_flagged": bool(rules_flagged),
+                    "label_promoted": promoted,
+                    "label_quality": "labeled",
+                    "feature_version": TALENT_FEATURE_VERSION,
+                }
+            )
+            previous_index = index_value
+            plays_up = promoted
+    return pd.DataFrame(rows, columns=TALENT_EXPORT_COLUMNS)
+

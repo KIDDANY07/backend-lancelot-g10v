@@ -17,6 +17,7 @@ import {
 } from './guards/ml-service-api-key.guard'
 import { MlEngineConfigService } from './ml-engine-config.service'
 import { MlReadinessService } from './ml-readiness.service'
+import { TalentReadinessService } from './talent-readiness.service'
 
 @ApiTags('ML - Motor y readiness')
 @ApiBearerAuth('bearerAuth')
@@ -25,6 +26,7 @@ export class MlEngineController {
   constructor(
     private readonly mlEngineConfigService: MlEngineConfigService,
     private readonly mlReadinessService: MlReadinessService,
+    private readonly talentReadinessService: TalentReadinessService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,5 +62,17 @@ export class MlEngineController {
   })
   getReadiness() {
     return this.mlReadinessService.getReadinessResponse()
+  }
+
+  @UseGuards(MlServiceOrJwtGuard, RolesGuard)
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', ML_SERVICE_ROLE)
+  @Get('talent-readiness')
+  @ApiSecurity('mlServiceApiKey')
+  @ApiOperation({
+    summary:
+      'Readiness del modelo de talento: temporadas con ascensos reales etiquetados frente a los mínimos. Acepta JWT o la cabecera x-api-key del servicio de ML',
+  })
+  getTalentReadiness() {
+    return this.talentReadinessService.getReadinessResponse()
   }
 }

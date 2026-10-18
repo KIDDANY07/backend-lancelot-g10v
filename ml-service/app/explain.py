@@ -39,8 +39,9 @@ def top_factors(
     bundle: dict[str, Any], row: pd.DataFrame, explainer: Any = None
 ) -> list[dict[str, Any]]:
     values = contributions(bundle, row, explainer)
+    features = bundle.get("features") or FEATURES
     order = np.argsort(-np.abs(values))[:TOP_FACTORS]
     return [
-        {"feature": FEATURES[index], "contribution": round(float(values[index]), 4)}
+        {"feature": features[index], "contribution": round(float(values[index]), 4)}
         for index in order
     ]

@@ -42,6 +42,31 @@ export class ResponseMlEngineConfigDto {
   prob_high_threshold: number
 
   @Expose()
+  @ApiProperty({ enum: MlEngineMode, example: MlEngineMode.RULES })
+  talent_engine: MlEngineMode
+
+  @Expose()
+  @ApiProperty({ example: 2 })
+  talent_min_seasons: number
+
+  @Expose()
+  @ApiProperty({ example: 10 })
+  talent_min_promotions: number
+
+  @Expose()
+  @ApiProperty({ example: 30 })
+  talent_min_athletes: number
+
+  @Expose()
+  @Transform(({ value }) => Number(value))
+  @ApiProperty({
+    example: 0.5,
+    description:
+      'Probabilidad de ascenso desde la cual se sugiere una señalización',
+  })
+  talent_prob_threshold: number
+
+  @Expose()
   @ApiProperty({ type: String, format: 'date-time' })
   created_at: Date
 

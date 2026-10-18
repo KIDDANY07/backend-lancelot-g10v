@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Expose } from 'class-transformer'
+import { MlModelTask } from '../entities/ml-model.entity'
 import { MlModelMetricsDto } from './create-ml-model.dto'
 
 export class ResponseMlModelDto {
@@ -10,6 +11,10 @@ export class ResponseMlModelDto {
   @Expose()
   @ApiProperty({ example: 'hgb-20261001-1530' })
   version: string
+
+  @Expose()
+  @ApiProperty({ enum: MlModelTask, example: MlModelTask.INJURY_RISK })
+  task: MlModelTask
 
   @Expose()
   @ApiProperty({ example: 'HistGradientBoostingClassifier' })

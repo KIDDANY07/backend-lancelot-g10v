@@ -9,9 +9,11 @@ import { Repository } from 'typeorm'
 import { ResponseMlEngineConfigDto } from './dto/response-ml-engine-config.dto'
 import { UpdateMlEngineConfigDto } from './dto/update-ml-engine-config.dto'
 import { MlEngineConfig } from './entities/ml-engine-config.entity'
+import { MlModelTask } from './entities/ml-model.entity'
 import { MlGovernanceRulesService } from './ml-governance-rules.service'
 import { MlModelsService } from './ml-models.service'
 import { MlReadinessService } from './ml-readiness.service'
+import { TalentReadinessService } from './talent-readiness.service'
 
 @Injectable()
 export class MlEngineConfigService implements OnApplicationBootstrap {
@@ -21,6 +23,7 @@ export class MlEngineConfigService implements OnApplicationBootstrap {
     private readonly mlModelsService: MlModelsService,
     private readonly mlReadinessService: MlReadinessService,
     private readonly mlGovernanceRulesService: MlGovernanceRulesService,
+    private readonly talentReadinessService: TalentReadinessService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -53,6 +56,22 @@ export class MlEngineConfigService implements OnApplicationBootstrap {
     }
   }
 
+  private async validateTalentEngine(updated: MlEngineConfig) {
+    const [activeModel, readiness] = await Promise.all([
+      this.mlModelsService.findActiveEntity(MlModelTask.TALENT),
+      this.talentReadinessService.evaluate(),
+    ])
+    const reason = this.mlGovernanceRulesService.checkEngineChange(
+      updated.talent_engine,
+      { hasActiveModel: !!activeModel, ready: readiness.ready },
+    )
+    if (reason)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: `Motor de talento: ${reason}`,
+      })
+  }
+
   private async validate(updated: MlEngineConfig, engineChanged: boolean) {
     if (
       Number(updated.prob_medium_threshold) >=
@@ -78,11 +97,14 @@ export class MlEngineConfigService implements OnApplicationBootstrap {
   async update(updateMlEngineConfigDto: UpdateMlEngineConfigDto) {
     const config = await this.getActive()
     const previousEngine = config.engine
+    const previousTalentEngine = config.talent_engine
     const updated = this.mlEngineConfigRepository.merge(
       config,
       updateMlEngineConfigDto,
     )
     await this.validate(updated, updated.engine !== previousEngine)
+    if (updated.talent_engine !== previousTalentEngine)
+      await this.validateTalentEngine(updated)
     await this.mlEngineConfigRepository.save(updated)
     return {
       status: 'Success',

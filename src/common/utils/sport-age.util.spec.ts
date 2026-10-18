@@ -1,5 +1,6 @@
 import {
   checkCategoryEligibility,
+  naturalCategoryFor,
   pickBaseAssignments,
   referenceYearOf,
   sportingAge,
@@ -10,6 +11,17 @@ const SUB15 = { name: 'Sub-15', max_age: 15 }
 const SUB20 = { name: 'Sub-20', max_age: '20' }
 
 describe('sport-age.util', () => {
+  it('elige la categoría que le corresponde por edad', () => {
+    const categories = [
+      { name: 'Sub-17', min_age: 16, max_age: 17 },
+      { name: 'Sub-13', min_age: 11, max_age: 13 },
+      { name: 'Sub-15', min_age: 14, max_age: 15 },
+    ]
+    expect(naturalCategoryFor(14, categories)?.name).toBe('Sub-15')
+    expect(naturalCategoryFor(9, categories)?.name).toBe('Sub-13')
+    expect(naturalCategoryFor(18, categories)).toBeNull()
+  })
+
   it('calcula la edad deportiva con el año de nacimiento', () => {
     expect(sportingAge('2012-11-30', 2026)).toBe(14)
     expect(sportingAge(null, 2026)).toBeNull()

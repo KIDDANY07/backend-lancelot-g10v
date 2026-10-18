@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsInt, IsOptional, Max, Min } from 'class-validator'
+import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator'
+import { MlModelTask } from '../entities/ml-model.entity'
 
 export class FilterMlModelDto {
   @IsOptional()
@@ -17,4 +18,9 @@ export class FilterMlModelDto {
   @Max(100)
   @ApiPropertyOptional({ default: 10, minimum: 1, maximum: 100 })
   limit?: number = 10
+
+  @IsOptional()
+  @IsEnum(MlModelTask)
+  @ApiPropertyOptional({ enum: MlModelTask })
+  task?: MlModelTask
 }

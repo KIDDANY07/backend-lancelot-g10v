@@ -28,8 +28,8 @@ def _request(method: str, path: str, **kwargs: Any) -> httpx.Response:
         raise BackendError(f"No se pudo contactar el backend: {error}") from error
 
 
-def get_readiness() -> dict[str, Any]:
-    response = _request("GET", "/ml/readiness")
+def get_readiness(path: str = "/ml/readiness") -> dict[str, Any]:
+    response = _request("GET", path)
     if response.status_code != 200:
         raise BackendError(
             f"El backend respondió {response.status_code} al consultar la readiness"
@@ -37,8 +37,12 @@ def get_readiness() -> dict[str, Any]:
     return response.json()["readiness"]
 
 
-def get_active_model_version() -> str | None:
-    response = _request("GET", "/ml/models/active")
+def get_talent_readiness() -> dict[str, Any]:
+    return get_readiness("/ml/talent-readiness")
+
+
+def get_active_model_version(task: str = "injury_risk") -> str | None:
+    response = _request("GET", "/ml/models/active", params={"task": task})
     if response.status_code == 404:
         return None
     if response.status_code != 200:

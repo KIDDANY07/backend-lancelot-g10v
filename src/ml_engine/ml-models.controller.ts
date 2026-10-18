@@ -22,6 +22,7 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 import { CreateMlModelDto } from './dto/create-ml-model.dto'
 import { FilterMlModelDto } from './dto/filter-ml-model.dto'
+import { MlModelTaskQueryDto } from './dto/ml-model-task-query.dto'
 import {
   ML_SERVICE_ROLE,
   MlServiceApiKeyGuard,
@@ -61,10 +62,11 @@ export class MlModelsController {
   @ApiSecurity('mlServiceApiKey')
   @ApiOperation({
     summary:
-      'Consultar el modelo de ML activo (lo usa el microservicio para saber qué modelo cargar)',
+      'Consultar el modelo de ML activo de una tarea (lo usa el microservicio para saber qué modelo cargar). Sin task se consulta el de riesgo de lesión',
   })
-  getActive() {
-    return this.mlModelsService.getActive()
+  @ApiQuery({ type: MlModelTaskQueryDto })
+  getActive(@Query() query: MlModelTaskQueryDto) {
+    return this.mlModelsService.getActive(query.task)
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -72,7 +74,7 @@ export class MlModelsController {
   @Put('id/:id/activate')
   @ApiOperation({
     summary:
-      'Activar un modelo: exige que no sea sintético, que se cumpla la readiness y que su PR-AUC supere a la de las reglas en el mismo conjunto de prueba',
+      'Activar un modelo: exige que no sea sintético, que se cumpla la readiness de su tarea y que su PR-AUC supere a la de las reglas en el mismo conjunto de prueba. Solo reemplaza al modelo activo de su misma tarea',
   })
   @ApiParam({ name: 'id', type: Number })
   activate(@Param('id', ParseIntPipe) id_model: number) {

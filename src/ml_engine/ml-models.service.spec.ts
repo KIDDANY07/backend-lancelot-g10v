@@ -1,9 +1,10 @@
 import { BadRequestException } from '@nestjs/common'
 import { Repository } from 'typeorm'
-import { MlModel } from './entities/ml-model.entity'
+import { MlModel, MlModelTask } from './entities/ml-model.entity'
 import { MlGovernanceRulesService } from './ml-governance-rules.service'
 import { MlModelsService } from './ml-models.service'
 import { MlReadinessService } from './ml-readiness.service'
+import { TalentReadinessService } from './talent-readiness.service'
 
 jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
@@ -12,6 +13,7 @@ jest.mock('@nestjs/typeorm', () => ({
 const BASE_MODEL = {
   id_model: 5,
   version: 'hgb-1',
+  task: MlModelTask.INJURY_RISK,
   feature_version: 'v1',
   is_synthetic: false,
   is_active: false,
@@ -19,7 +21,11 @@ const BASE_MODEL = {
   rules_baseline_metrics: { pr_auc: 0.2 },
 } as MlModel
 
-function buildService(model: MlModel | null, ready: boolean) {
+function buildService(
+  model: MlModel | null,
+  ready: boolean,
+  talentReady = false,
+) {
   const manager = { update: jest.fn().mockResolvedValue({}) }
   const repository = {
     findOne: jest.fn().mockResolvedValue(model),
@@ -36,6 +42,11 @@ function buildService(model: MlModel | null, ready: boolean) {
     repository as unknown as Repository<MlModel>,
     readinessService as unknown as MlReadinessService,
     new MlGovernanceRulesService(),
+    {
+      evaluate: jest
+        .fn()
+        .mockResolvedValue({ ready: talentReady, criteria: [] }),
+    } as unknown as TalentReadinessService,
   )
   return { service, manager }
 }
@@ -48,7 +59,7 @@ describe('MlModelsService.activate', () => {
     expect(manager.update).toHaveBeenNthCalledWith(
       1,
       MlModel,
-      { is_active: true },
+      { is_active: true, task: MlModelTask.INJURY_RISK },
       { is_active: false },
     )
     expect(manager.update).toHaveBeenNthCalledWith(
@@ -58,6 +69,36 @@ describe('MlModelsService.activate', () => {
       { is_active: true },
     )
     expect(result.model.is_active).toBe(true)
+  })
+
+  it('activates a talent model against the talent readiness and its own task', async () => {
+    const { service, manager } = buildService(
+      { ...BASE_MODEL, task: MlModelTask.TALENT, feature_version: 't1' },
+      false,
+      true,
+    )
+    const result = await service.activate(5)
+
+    expect(manager.update).toHaveBeenNthCalledWith(
+      1,
+      MlModel,
+      { is_active: true, task: MlModelTask.TALENT },
+      { is_active: false },
+    )
+    expect(result.mensaje).toBe('Modelo de ML de talento activado con éxito')
+  })
+
+  it('rejects a talent model without talent readiness', async () => {
+    const { service } = buildService(
+      { ...BASE_MODEL, task: MlModelTask.TALENT, feature_version: 't1' },
+      true,
+      false,
+    )
+    await expect(service.activate(5)).rejects.toMatchObject({
+      response: {
+        mensaje: expect.stringContaining('readiness') as string,
+      },
+    })
   })
 
   it('rejects a synthetic model with the reason in Spanish', async () => {

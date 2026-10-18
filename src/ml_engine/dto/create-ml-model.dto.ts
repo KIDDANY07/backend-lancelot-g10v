@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -15,6 +16,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator'
+import { MlModelTask } from '../entities/ml-model.entity'
 
 export class MlModelMetricsDto {
   @IsOptional()
@@ -76,6 +78,15 @@ export class MlModelMetricsDto {
 }
 
 export class CreateMlModelDto {
+  @IsOptional()
+  @IsEnum(MlModelTask)
+  @ApiPropertyOptional({
+    enum: MlModelTask,
+    default: MlModelTask.INJURY_RISK,
+    description: 'Tarea del modelo: riesgo de lesión o potencial de ascenso',
+  })
+  task?: MlModelTask
+
   @IsString()
   @IsNotEmpty()
   @Length(1, 50)

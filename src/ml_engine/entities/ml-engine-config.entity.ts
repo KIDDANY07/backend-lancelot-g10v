@@ -35,6 +35,21 @@ export class MlEngineConfig {
   @Column({ type: 'decimal', precision: 4, scale: 3, default: 0.5 })
   prob_high_threshold: number
 
+  @Column({ type: 'enum', enum: MlEngineMode, default: MlEngineMode.RULES })
+  talent_engine: MlEngineMode
+
+  @Column({ type: 'int', default: 2 })
+  talent_min_seasons: number
+
+  @Column({ type: 'int', default: 10 })
+  talent_min_promotions: number
+
+  @Column({ type: 'int', default: 30 })
+  talent_min_athletes: number
+
+  @Column({ type: 'decimal', precision: 4, scale: 3, default: 0.5 })
+  talent_prob_threshold: number
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date
 
