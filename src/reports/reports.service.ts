@@ -162,6 +162,8 @@ export class ReportsService {
       assists: 0,
       yellow_cards: 0,
       red_cards: 0,
+      saves: 0,
+      goals_conceded: 0,
     }
 
     if (athInCat) {
@@ -221,6 +223,11 @@ export class ReportsService {
             0,
           ),
           red_cards: relevantStats.reduce((sum, s) => sum + s.red_cards, 0),
+          saves: relevantStats.reduce((sum, s) => sum + (s.saves ?? 0), 0),
+          goals_conceded: relevantStats.reduce(
+            (sum, s) => sum + (s.goals_conceded ?? 0),
+            0,
+          ),
         }
       }
     }

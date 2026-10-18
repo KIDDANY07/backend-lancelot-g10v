@@ -41,6 +41,9 @@ export class WeightedProgressIndex {
   @Column({ type: 'decimal', precision: 5, scale: 2 })
   participation_score: number
 
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  contribution_score?: number | null
+
   @Column({ type: 'decimal', precision: 5, scale: 2 })
   index_value: number
 

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Expose, Transform } from 'class-transformer'
 
 export class ResponseWeightedProgressIndexDto {
@@ -40,6 +40,15 @@ export class ResponseWeightedProgressIndexDto {
   @Expose()
   @ApiProperty({ example: 70 })
   participation_score: number
+
+  @Expose()
+  @ApiPropertyOptional({
+    example: 62.5,
+    nullable: true,
+    description:
+      'Percentil de su contribución en partidos frente a su grupo de posición en la categoría (0-100). Jugadores de campo: goles y asistencias por partido completo; arqueros: porcentaje de atajadas y vallas invictas. Forma parte de la participación; null si no tiene minutos o la posición no está en el catálogo',
+  })
+  contribution_score?: number | null
 
   @Expose()
   @ApiProperty({ example: 78.5 })

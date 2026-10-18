@@ -19,6 +19,25 @@ export interface ScoreResult {
   warnings: string[]
 }
 
+export interface MatchAppearance {
+  minutes: number
+  matchMinutes: number
+  goals: number
+  assists: number
+  saves: number | null
+  goals_conceded: number | null
+}
+
+export interface GoalkeeperMetrics {
+  savePct: number | null
+  cleanSheetRate: number | null
+}
+
+export interface ContributionResult {
+  score: number | null
+  warnings: string[]
+}
+
 const NEUTRAL_PERCENTILE = 50
 
 @Injectable()
@@ -102,13 +121,113 @@ export class ProgressIndexCalculatorService {
     )
   }
 
+  computeMidrankPercentile(value: number, cohortValues: number[]): number {
+    if (cohortValues.length <= 1) return NEUTRAL_PERCENTILE
+    const below = cohortValues.filter((v) => v < value).length
+    const equal = cohortValues.filter((v) => v === value).length
+    return this.round2(((below + equal / 2) / cohortValues.length) * 100)
+  }
+
+  computeFieldContributionRate(appearances: MatchAppearance[]): number | null {
+    const completeMatches = appearances.reduce(
+      (sum, a) => sum + a.minutes / a.matchMinutes,
+      0,
+    )
+    if (completeMatches <= 0) return null
+    const contributions = appearances.reduce(
+      (sum, a) => sum + a.goals + a.assists,
+      0,
+    )
+    return contributions / completeMatches
+  }
+
+  computeGoalkeeperMetrics(appearances: MatchAppearance[]): GoalkeeperMetrics {
+    const recorded = appearances.filter(
+      (a) => a.minutes > 0 && (a.saves !== null || a.goals_conceded !== null),
+    )
+    const saves = recorded.reduce((sum, a) => sum + (a.saves ?? 0), 0)
+    const conceded = recorded.reduce(
+      (sum, a) => sum + (a.goals_conceded ?? 0),
+      0,
+    )
+    const longEnough = appearances.filter(
+      (a) => a.goals_conceded !== null && a.minutes >= a.matchMinutes / 2,
+    )
+    return {
+      savePct: saves + conceded > 0 ? saves / (saves + conceded) : null,
+      cleanSheetRate:
+        longEnough.length > 0
+          ? longEnough.filter((a) => a.goals_conceded === 0).length /
+            longEnough.length
+          : null,
+    }
+  }
+
+  computeFieldContributionScore(
+    athleteRate: number | null,
+    cohortRates: number[],
+  ): ContributionResult {
+    if (athleteRate === null)
+      return {
+        score: null,
+        warnings: [
+          'Sin minutos en partidos: no se calcula la contribución en goles y asistencias',
+        ],
+      }
+    return {
+      score: this.computeMidrankPercentile(athleteRate, cohortRates),
+      warnings: [],
+    }
+  }
+
+  computeGoalkeeperScore(
+    athlete: GoalkeeperMetrics,
+    cohort: GoalkeeperMetrics[],
+  ): ContributionResult {
+    const percentiles: number[] = []
+    if (athlete.savePct !== null)
+      percentiles.push(
+        this.computeMidrankPercentile(
+          athlete.savePct,
+          cohort
+            .map((m) => m.savePct)
+            .filter((v): v is number => v !== null),
+        ),
+      )
+    if (athlete.cleanSheetRate !== null)
+      percentiles.push(
+        this.computeMidrankPercentile(
+          athlete.cleanSheetRate,
+          cohort
+            .map((m) => m.cleanSheetRate)
+            .filter((v): v is number => v !== null),
+        ),
+      )
+    if (percentiles.length === 0)
+      return {
+        score: null,
+        warnings: [
+          'Sin atajadas ni goles recibidos registrados: no se calcula el rendimiento del arquero',
+        ],
+      }
+    return {
+      score: this.round2(
+        percentiles.reduce((sum, p) => sum + p, 0) / percentiles.length,
+      ),
+      warnings: [],
+    }
+  }
+
   computeParticipationScore(
     trainingAttendanceRatio: number | null,
     matchMinutesRatio: number | null,
+    contributionRatio: number | null = null,
   ): ScoreResult {
-    const ratios = [trainingAttendanceRatio, matchMinutesRatio].filter(
-      (r): r is number => r !== null,
-    )
+    const ratios = [
+      trainingAttendanceRatio,
+      matchMinutesRatio,
+      contributionRatio,
+    ].filter((r): r is number => r !== null)
     if (ratios.length === 0)
       return {
         score: 0,

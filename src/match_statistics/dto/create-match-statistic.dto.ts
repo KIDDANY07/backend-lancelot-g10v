@@ -53,6 +53,30 @@ export class CreateMatchStatisticDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
+  @ApiPropertyOptional({
+    example: 4,
+    nullable: true,
+    description:
+      'Solo arqueros: tiros al arco que atajó. Junto con los goles recibidos da su porcentaje de atajadas',
+  })
+  saves?: number | null
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @ApiPropertyOptional({
+    example: 1,
+    nullable: true,
+    description:
+      'Solo arqueros: goles que recibió mientras estuvo en la cancha. Con 0 y al menos medio partido jugado cuenta como valla invicta',
+  })
+  goals_conceded?: number | null
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
   @Max(10)
   @ApiPropertyOptional({
     example: 7,

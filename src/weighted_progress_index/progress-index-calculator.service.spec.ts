@@ -1,4 +1,7 @@
-import { ProgressIndexCalculatorService } from './progress-index-calculator.service'
+import {
+  MatchAppearance,
+  ProgressIndexCalculatorService,
+} from './progress-index-calculator.service'
 
 describe('ProgressIndexCalculatorService', () => {
   let service: ProgressIndexCalculatorService
@@ -79,6 +82,94 @@ describe('ProgressIndexCalculatorService', () => {
     it('clamps an out-of-range average to 100', () => {
       const result = service.computeTechnicalScore([10, 10, 10])
       expect(result.score).toBe(100)
+    })
+  })
+
+  describe('match contribution', () => {
+    const appearance = (
+      overrides: Partial<MatchAppearance> = {},
+    ): MatchAppearance => ({
+      minutes: 90,
+      matchMinutes: 90,
+      goals: 0,
+      assists: 0,
+      saves: null,
+      goals_conceded: null,
+      ...overrides,
+    })
+
+    it('counts goals and assists per complete match, so fewer minutes do not penalize', () => {
+      expect(
+        service.computeFieldContributionRate([
+          appearance({ minutes: 45, goals: 1 }),
+          appearance({ minutes: 45, assists: 1 }),
+        ]),
+      ).toBe(2)
+      expect(
+        service.computeFieldContributionRate([
+          appearance({ minutes: 20, matchMinutes: 40, goals: 1 }),
+        ]),
+      ).toBe(2)
+    })
+
+    it('has no rate without minutes', () => {
+      expect(
+        service.computeFieldContributionRate([appearance({ minutes: 0 })]),
+      ).toBeNull()
+    })
+
+    it('gives everyone the neutral 50 when nobody has contributed yet', () => {
+      expect(service.computeMidrankPercentile(0, [0, 0, 0, 0])).toBe(50)
+      expect(service.computeFieldContributionScore(0, [0, 0, 0]).score).toBe(50)
+    })
+
+    it('ranks a field player only against the rates of the cohort', () => {
+      expect(
+        service.computeFieldContributionScore(1.5, [0, 0.5, 1.5, 3]).score,
+      ).toBe(62.5)
+    })
+
+    it('warns instead of scoring a player without minutes', () => {
+      expect(service.computeFieldContributionScore(null, [1])).toEqual({
+        score: null,
+        warnings: [
+          'Sin minutos en partidos: no se calcula la contribución en goles y asistencias',
+        ],
+      })
+    })
+
+    it('computes the save percentage and clean sheets of a goalkeeper', () => {
+      expect(
+        service.computeGoalkeeperMetrics([
+          appearance({ saves: 6, goals_conceded: 0 }),
+          appearance({ saves: 3, goals_conceded: 1 }),
+          appearance({ minutes: 30, saves: 0, goals_conceded: 0 }),
+        ]),
+      ).toEqual({ savePct: 0.9, cleanSheetRate: 0.5 })
+    })
+
+    it('scores a goalkeeper with both metrics against other goalkeepers', () => {
+      const result = service.computeGoalkeeperScore(
+        { savePct: 0.8, cleanSheetRate: 0.5 },
+        [
+          { savePct: 0.8, cleanSheetRate: 0.5 },
+          { savePct: 0.6, cleanSheetRate: 0.5 },
+        ],
+      )
+      expect(result).toEqual({ score: 62.5, warnings: [] })
+    })
+
+    it('warns when a goalkeeper has no saves or goals conceded recorded', () => {
+      expect(
+        service.computeGoalkeeperScore(
+          { savePct: null, cleanSheetRate: null },
+          [],
+        ).score,
+      ).toBeNull()
+    })
+
+    it('adds the contribution to the participation average', () => {
+      expect(service.computeParticipationScore(0.8, 0.6, 0.4).score).toBe(60)
     })
   })
 

@@ -37,6 +37,12 @@ export class MatchStatistic {
   red_cards: number
 
   @Column({ type: 'smallint', nullable: true })
+  saves?: number | null
+
+  @Column({ type: 'smallint', nullable: true })
+  goals_conceded?: number | null
+
+  @Column({ type: 'smallint', nullable: true })
   rpe?: number | null
 
   @CreateDateColumn({ type: 'timestamptz' })
