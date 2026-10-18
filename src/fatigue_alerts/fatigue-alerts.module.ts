@@ -33,6 +33,10 @@ import { LoadSeriesService } from './load-series.service'
     LoadSeriesService,
     LoadMonitoringService,
   ],
-  exports: [AcwrCalculatorService, LoadRecordsService],
+  exports: [
+    AcwrCalculatorService,
+    LoadRecordsService,
+    FatigueAlertsCronService,
+  ],
 })
 export class FatigueAlertsModule {}

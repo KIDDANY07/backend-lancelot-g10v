@@ -31,6 +31,10 @@ import { RulesInjuryRiskPredictor } from './predictors/rules-injury-risk.predict
     RulesInjuryRiskPredictor,
     MlInjuryRiskPredictor,
   ],
-  exports: [RulesInjuryRiskPredictor, MlInjuryRiskPredictor],
+  exports: [
+    RulesInjuryRiskPredictor,
+    MlInjuryRiskPredictor,
+    InjuryRiskAssessmentsCronService,
+  ],
 })
 export class InjuryRiskAssessmentsModule {}

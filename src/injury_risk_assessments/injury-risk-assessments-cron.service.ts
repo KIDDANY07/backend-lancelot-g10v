@@ -5,6 +5,12 @@ import { Repository } from 'typeorm'
 import { AcwrConfigService } from 'src/acwr_config/acwr-config.service'
 import { AthletesInCategoriesService } from 'src/athletes_in_categories/athletes_in_categories.service'
 import { ScopedConfigCache } from 'src/common/scoped_config/scoped-config'
+import {
+  CLUB_TIMEZONE,
+  parseDateKey,
+  todayKey,
+} from 'src/common/utils/date.util'
+import { DailyAlertsSummary } from 'src/fatigue_alerts/fatigue-alerts-cron.service'
 import { CHRONIC_WINDOW_DAYS } from 'src/fatigue_alerts/acwr-calculator.service'
 import { LoadRecordsService } from 'src/fatigue_alerts/load-records.service'
 import { InjuryRiskRuleConfig } from 'src/injury_risk_rule_config/entities/injury-risk-rule-config.entity'
@@ -14,6 +20,7 @@ import { UsersService } from 'src/users/users.service'
 import {
   InjuryRiskAssessment,
   InjuryRiskAssessmentMethod,
+  InjuryRiskAssessmentStatus,
 } from './entities/injury-risk-assessment.entity'
 import { RulesInjuryRiskPredictor } from './predictors/rules-injury-risk.predictor'
 
@@ -34,10 +41,22 @@ export class InjuryRiskAssessmentsCronService {
     private readonly athletesInCategoriesService: AthletesInCategoriesService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_4AM)
+  @Cron(CronExpression.EVERY_DAY_AT_4AM, { timeZone: CLUB_TIMEZONE })
   async recalculateInjuryRiskAssessments() {
-    const referenceDate = new Date()
+    await this.runForDate(todayKey())
+  }
+
+  async runForDate(dateKey: string): Promise<DailyAlertsSummary> {
+    const referenceDate = parseDateKey(dateKey)
+    const summary: DailyAlertsSummary = {
+      athletes: 0,
+      created: 0,
+      updated: 0,
+      removed: 0,
+      failed: 0,
+    }
     const athleteIds = await this.usersService.findAllAthleteIds()
+    summary.athletes = athleteIds.length
     const categoryByUser =
       await this.athletesInCategoriesService.findActiveSeasonCategoryMap()
     const acwrCache = new ScopedConfigCache((id_category) =>
@@ -52,13 +71,15 @@ export class InjuryRiskAssessmentsCronService {
         const id_category = categoryByUser.get(id_user)
         const { config: acwrThresholds } = await acwrCache.get(id_category)
         const { config: ruleThresholds } = await rulesCache.get(id_category)
-        await this.processAthlete(
+        const outcome = await this.processAthlete(
           id_user,
           referenceDate,
           acwrThresholds,
           ruleThresholds,
         )
+        if (outcome !== 'unchanged') summary[outcome]++
       } catch (error) {
+        summary.failed++
         this.logger.error(
           `Error al evaluar el riesgo de lesión del deportista ${id_user}`,
           error instanceof Error ? error.stack : String(error),
@@ -67,8 +88,9 @@ export class InjuryRiskAssessmentsCronService {
     }
 
     this.logger.log(
-      `Recalculo de riesgo de lesión completado para ${athleteIds.length} deportistas`,
+      `Recalculo de riesgo de lesión del ${dateKey}: ${summary.created} evaluaciones nuevas, ${summary.updated} actualizadas y ${summary.removed} retiradas`,
     )
+    return summary
   }
 
   private async processAthlete(
@@ -76,7 +98,7 @@ export class InjuryRiskAssessmentsCronService {
     referenceDate: Date,
     acwrThresholds: { low_min: number; low_max: number; medium_max: number },
     ruleThresholds: InjuryRiskRuleConfig,
-  ) {
+  ): Promise<'created' | 'updated' | 'removed' | 'unchanged'> {
     const lookbackDays =
       CHRONIC_WINDOW_DAYS +
       Math.max(
@@ -126,19 +148,25 @@ export class InjuryRiskAssessmentsCronService {
       },
     })
 
-    if (!result.triggered_rules?.length || !result.riskLevel) return
-
     const dateKey = referenceDate.toISOString().slice(0, 10)
-    const alreadyExists = await this.injuryRiskAssessmentsRepository.findOne({
+    const existing = await this.injuryRiskAssessmentsRepository.findOne({
       where: {
         id_user,
         assessment_date: dateKey,
         method: InjuryRiskAssessmentMethod.RULES,
       },
     })
-    if (alreadyExists) return
 
-    await this.injuryRiskAssessmentsRepository.save({
+    if (!result.triggered_rules?.length || !result.riskLevel) {
+      if (existing?.status !== InjuryRiskAssessmentStatus.OPEN)
+        return 'unchanged'
+      await this.injuryRiskAssessmentsRepository.remove(existing)
+      return 'removed'
+    }
+    if (existing && existing.status !== InjuryRiskAssessmentStatus.OPEN)
+      return 'unchanged'
+
+    const values = {
       id_user,
       assessment_date: dateKey,
       method: InjuryRiskAssessmentMethod.RULES,
@@ -146,6 +174,18 @@ export class InjuryRiskAssessmentsCronService {
       triggered_rules: result.triggered_rules,
       details: result.factors.join('; '),
       acwr_value: result.acwr_value ?? null,
-    })
+    }
+    if (
+      existing &&
+      existing.risk_level === values.risk_level &&
+      existing.details === values.details
+    )
+      return 'unchanged'
+    await this.injuryRiskAssessmentsRepository.save(
+      existing
+        ? this.injuryRiskAssessmentsRepository.merge(existing, values)
+        : values,
+    )
+    return existing ? 'updated' : 'created'
   }
 }

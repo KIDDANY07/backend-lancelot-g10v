@@ -4,10 +4,16 @@ import {
   enumerateDateKeys,
   parseDateKey,
   toDateKey,
+  todayKey,
 } from './date.util'
 import { percentage } from './ratio.util'
 
 describe('date.util', () => {
+  it('uses the club timezone for today, not UTC', () => {
+    expect(todayKey(new Date('2026-10-18T03:30:00Z'))).toBe('2026-10-17')
+    expect(todayKey(new Date('2026-10-18T05:30:00Z'))).toBe('2026-10-18')
+  })
+
   it('converts between Date and YYYY-MM-DD in UTC', () => {
     expect(toDateKey(parseDateKey('2026-03-28'))).toBe('2026-03-28')
   })

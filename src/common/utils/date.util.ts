@@ -1,5 +1,7 @@
 const MS_PER_DAY = 86_400_000
 
+export const CLUB_TIMEZONE = process.env.CLUB_TIMEZONE || 'America/Bogota'
+
 export function toDateKey(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
@@ -14,8 +16,13 @@ export function rawDateToKey(value: unknown): string | null {
   return null
 }
 
-export function todayKey(): string {
-  return toDateKey(new Date())
+export function todayKey(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLUB_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
 }
 
 export function addDaysToKey(dateKey: string, days: number): string {

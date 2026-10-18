@@ -1,10 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { todayKey } from 'src/common/utils/date.util'
+import { CLUB_TIMEZONE, todayKey } from 'src/common/utils/date.util'
 import { extractErrorMessage } from 'src/common/utils/error-message.util'
-import { MlInferenceService } from 'src/ml_engine/ml-inference.service'
+import {
+  InferenceSummary,
+  MlInferenceService,
+} from 'src/ml_engine/ml-inference.service'
 import { MlFeaturesService } from './ml-features.service'
-import { TalentFeaturesService } from './talent-features.service'
+import {
+  TalentDatasetSummary,
+  TalentFeaturesService,
+} from './talent-features.service'
+
+export interface StepError {
+  error: string
+}
+
+export interface FeaturePipelineSummary {
+  snapshot: { athletes: number; snapshots: number; failed: number } | StepError
+  inference: InferenceSummary | StepError
+  labels:
+    | { processed: number; labeled_positive: number; unknown_mechanism: number }
+    | StepError
+  talent_dataset: TalentDatasetSummary | StepError
+}
 
 @Injectable()
 export class MlFeaturesCronService {
@@ -16,53 +35,77 @@ export class MlFeaturesCronService {
     private readonly talentFeaturesService: TalentFeaturesService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_5AM)
+  @Cron(CronExpression.EVERY_DAY_AT_5AM, { timeZone: CLUB_TIMEZONE })
   async runDailyFeaturePipeline() {
-    const today = todayKey()
+    await this.runPipeline(todayKey())
+  }
 
+  private async step<T>(
+    description: string,
+    work: () => Promise<T>,
+  ): Promise<T | StepError> {
     try {
-      const snapshot = await this.mlFeaturesService.buildSnapshots(today, today)
-      this.logger.log(
-        `Snapshot de variables del ${today}: ${snapshot.snapshots} deportistas, ${snapshot.failed.length} con error`,
-      )
+      return await work()
     } catch (error) {
-      this.logger.error(
-        `Error al generar el snapshot diario de variables: ${extractErrorMessage(error)}`,
-      )
+      const message = extractErrorMessage(error)
+      this.logger.error(`Error en ${description}: ${message}`)
+      return { error: message }
     }
+  }
 
-    try {
-      const inference = await this.mlInferenceService.runForDate(today)
+  async runPipeline(dateKey: string): Promise<FeaturePipelineSummary> {
+    const snapshot = await this.step(
+      'el snapshot diario de variables',
+      async () => {
+        const result = await this.mlFeaturesService.buildSnapshots(
+          dateKey,
+          dateKey,
+        )
+        this.logger.log(
+          `Snapshot de variables del ${dateKey}: ${result.snapshots} deportistas, ${result.failed.length} con error`,
+        )
+        return {
+          athletes: result.athletes,
+          snapshots: result.snapshots,
+          failed: result.failed.length,
+        }
+      },
+    )
+
+    const inference = await this.step('la predicción de ML', async () => {
+      const result = await this.mlInferenceService.runForDate(dateKey)
       this.logger.log(
-        inference.skipped_reason && inference.predicted === 0
-          ? `ML (${inference.engine}) omitido: ${inference.skipped_reason}`
-          : `ML (${inference.engine}): ${inference.predicted} predicciones, ${inference.assessments_created} evaluaciones creadas, ${inference.failed} fallos`,
+        result.skipped_reason && result.predicted === 0
+          ? `ML (${result.engine}) omitido: ${result.skipped_reason}`
+          : `ML (${result.engine}): ${result.predicted} predicciones, ${result.assessments_created} evaluaciones creadas, ${result.failed} fallos`,
       )
-    } catch (error) {
-      this.logger.error(
-        `Error en la predicción diaria de ML: ${extractErrorMessage(error)}`,
-      )
-    }
+      return result
+    })
 
-    try {
-      const labels = await this.mlFeaturesService.labelRows({
+    const labels = await this.step('el etiquetado retroactivo', async () => {
+      const result = await this.mlFeaturesService.labelRows({
         onlyUnlabeled: true,
       })
       this.logger.log(
-        `Etiquetado retroactivo: ${labels.processed} snapshots (${labels.labeled_positive} positivos, ${labels.unknown_mechanism} con mecanismo desconocido)`,
+        `Etiquetado retroactivo: ${result.processed} snapshots (${result.labeled_positive} positivos, ${result.unknown_mechanism} con mecanismo desconocido)`,
       )
-    } catch (error) {
-      this.logger.error(
-        `Error en el etiquetado retroactivo: ${extractErrorMessage(error)}`,
-      )
-    }
+      return {
+        processed: result.processed,
+        labeled_positive: result.labeled_positive,
+        unknown_mechanism: result.unknown_mechanism,
+      }
+    })
 
-    try {
-      await this.talentFeaturesService.rebuild()
-    } catch (error) {
-      this.logger.error(
-        `Error al reconstruir el dataset de talento: ${extractErrorMessage(error)}`,
-      )
+    const talentDataset = await this.step(
+      'la reconstrucción del dataset de talento',
+      () => this.talentFeaturesService.rebuild(),
+    )
+
+    return {
+      snapshot,
+      inference,
+      labels,
+      talent_dataset: talentDataset,
     }
   }
 }
