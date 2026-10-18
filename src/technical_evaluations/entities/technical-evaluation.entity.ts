@@ -1,5 +1,6 @@
 import { Season } from 'src/seasons/entities/season.entity'
 import { User } from 'src/users/entities/user.entity'
+import { EvaluationDimension } from '../evaluation-catalog'
 import {
   Column,
   CreateDateColumn,
@@ -20,6 +21,13 @@ export class TechnicalEvaluation {
 
   @Column()
   id_season: number
+
+  @Column({
+    type: 'enum',
+    enum: EvaluationDimension,
+    default: EvaluationDimension.TECNICA,
+  })
+  dimension: EvaluationDimension
 
   @Column({ length: 60 })
   indicator: string

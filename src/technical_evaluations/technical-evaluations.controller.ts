@@ -53,6 +53,16 @@ export class TechnicalEvaluationsController {
   }
 
   @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'DEPORTISTA')
+  @Get('catalog')
+  @ApiOperation({
+    summary:
+      'Catálogo fijo de indicadores de cada dimensión (técnica y táctica) con los que se registra una evaluación',
+  })
+  getCatalog() {
+    return this.technicalEvaluationsService.getCatalog()
+  }
+
+  @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'DEPORTISTA')
   @Get(':id_user/timeline')
   @ApiOperation({ summary: 'Consultar el historial técnico de un deportista' })
   @ApiParam({ name: 'id_user', type: Number })
@@ -81,7 +91,10 @@ export class TechnicalEvaluationsController {
 
   @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
   @Post()
-  @ApiOperation({ summary: 'Registrar una evaluación técnica' })
+  @ApiOperation({
+    summary:
+      'Registrar una evaluación técnica o táctica: el indicador debe pertenecer al catálogo de su dimensión',
+  })
   @ApiCreatedResponse({ type: ResponseTechnicalEvaluationDto })
   create(@Body() createTechnicalEvaluationDto: CreateTechnicalEvaluationDto) {
     return this.technicalEvaluationsService.create(createTechnicalEvaluationDto)

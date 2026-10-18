@@ -2,12 +2,14 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
   IsDateString,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator'
+import { EvaluationDimension } from '../evaluation-catalog'
 
 export class FilterTechnicalEvaluationDto {
   @IsOptional()
@@ -38,6 +40,13 @@ export class FilterTechnicalEvaluationDto {
   @Min(1)
   @ApiPropertyOptional({ example: 1 })
   id_season?: number
+
+  @IsOptional()
+  @IsEnum(EvaluationDimension, {
+    message: 'La dimensión debe ser tecnica o tactica',
+  })
+  @ApiPropertyOptional({ enum: EvaluationDimension })
+  dimension?: EvaluationDimension
 
   @IsOptional()
   @IsString()

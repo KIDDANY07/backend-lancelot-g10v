@@ -34,6 +34,10 @@ export class ResponseWeightedProgressIndexDto {
   technical_score: number
 
   @Expose()
+  @ApiProperty({ example: 65 })
+  tactical_score: number
+
+  @Expose()
   @ApiProperty({ example: 70 })
   participation_score: number
 

@@ -319,6 +319,7 @@ export class ReportsService {
         end_date: index.season.end_date,
         physical_score: index.physical_score,
         technical_score: index.technical_score,
+        tactical_score: index.tactical_score,
         participation_score: index.participation_score,
         index_value: index.index_value,
       })),

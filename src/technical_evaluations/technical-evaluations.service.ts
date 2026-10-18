@@ -13,6 +13,11 @@ import { FilterTechnicalEvaluationDto } from './dto/filter-technical-evaluation.
 import { ResponseTechnicalEvaluationDto } from './dto/response-technical-evaluation.dto'
 import { UpdateTechnicalEvaluationDto } from './dto/update-technical-evaluation.dto'
 import { TechnicalEvaluation } from './entities/technical-evaluation.entity'
+import {
+  EVALUATION_INDICATORS,
+  EvaluationDimension,
+  indicatorErrorFor,
+} from './evaluation-catalog'
 
 @Injectable()
 export class TechnicalEvaluationsService {
@@ -52,6 +57,22 @@ export class TechnicalEvaluationsService {
       })
   }
 
+  private assertIndicator(dimension: EvaluationDimension, indicator: string) {
+    const mensaje = indicatorErrorFor(dimension, indicator)
+    if (mensaje) throw new BadRequestException({ status: 'Error', mensaje })
+  }
+
+  getCatalog() {
+    return {
+      status: 'Success',
+      mensaje: 'Catálogo de indicadores técnicos y tácticos',
+      catalog: Object.values(EvaluationDimension).map((dimension) => ({
+        dimension,
+        indicators: EVALUATION_INDICATORS[dimension],
+      })),
+    }
+  }
+
   async findOneById(id_eval_tech: number) {
     return this.technicalEvaluationsRepository.findOne({
       where: { id_eval_tech },
@@ -65,6 +86,7 @@ export class TechnicalEvaluationsService {
       limit = 10,
       id_user,
       id_season,
+      dimension,
       indicator,
       eval_date,
     } = filters
@@ -81,6 +103,8 @@ export class TechnicalEvaluationsService {
     if (id_user) query.andWhere('evaluation.id_user = :id_user', { id_user })
     if (id_season)
       query.andWhere('evaluation.id_season = :id_season', { id_season })
+    if (dimension)
+      query.andWhere('evaluation.dimension = :dimension', { dimension })
     if (indicator)
       query.andWhere('evaluation.indicator ILIKE :indicator', {
         indicator: `%${indicator}%`,
@@ -150,6 +174,10 @@ export class TechnicalEvaluationsService {
   }
 
   async create(createTechnicalEvaluationDto: CreateTechnicalEvaluationDto) {
+    this.assertIndicator(
+      createTechnicalEvaluationDto.dimension,
+      createTechnicalEvaluationDto.indicator,
+    )
     await this.validateReferences(
       createTechnicalEvaluationDto.id_user,
       createTechnicalEvaluationDto.id_season,
@@ -175,6 +203,11 @@ export class TechnicalEvaluationsService {
       evaluation,
       updateTechnicalEvaluationDto,
     )
+    if (
+      updateTechnicalEvaluationDto.dimension !== undefined ||
+      updateTechnicalEvaluationDto.indicator !== undefined
+    )
+      this.assertIndicator(updated.dimension, updated.indicator)
     await this.validateReferences(
       updated.id_user,
       updated.id_season,

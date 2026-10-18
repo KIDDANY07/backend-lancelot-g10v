@@ -44,6 +44,7 @@ export interface TalentDetectionInput {
   cohort_size: number
   physical_score: number
   technical_score: number
+  tactical_score: number | null
   participation_score: number
   previous_index_value: number | null
   had_severe_injury: boolean
@@ -128,16 +129,20 @@ export class TalentDetectionRulesService {
       `Percentil ${this.format(input.percentile)} del índice (${this.format(input.index_value)}) en su cohorte (mínimo ${thresholds.min_percentile}): ${highPercentile ? 'cumple' : 'no cumple'}`,
     )
 
-    const minDimension = Math.min(
-      input.physical_score,
-      input.technical_score,
-      input.participation_score,
-    )
+    const dimensions: [string, number][] = [
+      ['físico', input.physical_score],
+      ['técnico', input.technical_score],
+      ...(input.tactical_score === null
+        ? []
+        : ([['táctico', input.tactical_score]] as [string, number][])),
+      ['participación', input.participation_score],
+    ]
+    const minDimension = Math.min(...dimensions.map(([, score]) => score))
     const multidimensional = minDimension >= thresholds.min_dimension_score
     if (multidimensional)
       triggered.push(TalentCriterionCode.MULTIDIMENSIONAL_PROFILE)
     lines.push(
-      `Perfil multidimensional: físico ${this.format(input.physical_score)}; técnico ${this.format(input.technical_score)}; participación ${this.format(input.participation_score)} (mínimo ${thresholds.min_dimension_score} en cada dimensión): ${multidimensional ? 'cumple' : 'no cumple'}`,
+      `Perfil multidimensional: ${dimensions.map(([label, score]) => `${label} ${this.format(score)}`).join('; ')} (mínimo ${thresholds.min_dimension_score} en cada dimensión): ${multidimensional ? 'cumple' : 'no cumple'}`,
     )
 
     let supporting = 0

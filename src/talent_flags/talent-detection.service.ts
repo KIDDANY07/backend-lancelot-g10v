@@ -58,7 +58,10 @@ export class TalentDetectionService {
 
     const [indices, assignments, categories, previousSeason, existingFlags] =
       await Promise.all([
-        this.weightedProgressIndexRepository.find({ where: { id_season } }),
+        this.weightedProgressIndexRepository.find({
+          where: { id_season },
+          relations: { profile: true },
+        }),
         this.athletesInCategoryRepository
           .createQueryBuilder('assignment')
           .leftJoin('assignment.user', 'user')
@@ -151,6 +154,10 @@ export class TalentDetectionService {
           cohort_size: cohort.length,
           physical_score: Number(index.physical_score),
           technical_score: Number(index.technical_score),
+          tactical_score:
+            Number(index.profile?.w_tactical ?? 0) > 0
+              ? Number(index.tactical_score)
+              : null,
           participation_score: Number(index.participation_score),
           previous_index_value: previousIndexByUser.get(index.id_user) ?? null,
           had_severe_injury: severeInjuryUsers.has(index.id_user),

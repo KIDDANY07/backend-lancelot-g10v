@@ -3,7 +3,15 @@ import { Injectable } from '@nestjs/common'
 export interface ProgressIndexWeights {
   w_physical: number
   w_technical: number
+  w_tactical: number
   w_participation: number
+}
+
+export interface ProgressIndexScores {
+  physical: number
+  technical: number
+  tactical: number
+  participation: number
 }
 
 export interface ScoreResult {
@@ -71,14 +79,27 @@ export class ProgressIndexCalculatorService {
     return { score: this.round2(score), warnings: [] }
   }
 
-  computeTechnicalScore(scores: number[]): ScoreResult {
-    if (scores.length === 0)
-      return {
-        score: 0,
-        warnings: ['Sin evaluaciones técnicas registradas en la temporada'],
-      }
+  private computeEvaluationScore(
+    scores: number[],
+    emptyWarning: string,
+  ): ScoreResult {
+    if (scores.length === 0) return { score: 0, warnings: [emptyWarning] }
     const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length
     return { score: this.round2(this.clamp(avg * 10, 0, 100)), warnings: [] }
+  }
+
+  computeTechnicalScore(scores: number[]): ScoreResult {
+    return this.computeEvaluationScore(
+      scores,
+      'Sin evaluaciones técnicas registradas en la temporada',
+    )
+  }
+
+  computeTacticalScore(scores: number[]): ScoreResult {
+    return this.computeEvaluationScore(
+      scores,
+      'Sin evaluaciones tácticas registradas en la temporada',
+    )
   }
 
   computeParticipationScore(
@@ -101,15 +122,14 @@ export class ProgressIndexCalculatorService {
   }
 
   computeIndex(
-    physicalScore: number,
-    technicalScore: number,
-    participationScore: number,
+    scores: ProgressIndexScores,
     weights: ProgressIndexWeights,
   ): number {
     const value =
-      physicalScore * Number(weights.w_physical) +
-      technicalScore * Number(weights.w_technical) +
-      participationScore * Number(weights.w_participation)
+      scores.physical * Number(weights.w_physical) +
+      scores.technical * Number(weights.w_technical) +
+      scores.tactical * Number(weights.w_tactical ?? 0) +
+      scores.participation * Number(weights.w_participation)
     return this.round2(this.clamp(value, 0, 100))
   }
 }

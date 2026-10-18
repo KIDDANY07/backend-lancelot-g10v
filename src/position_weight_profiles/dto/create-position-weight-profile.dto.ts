@@ -29,8 +29,15 @@ export class CreatePositionWeightProfileDto {
   @IsNumber()
   @Min(0)
   @Max(1)
-  @ApiProperty({ description: 'Peso del componente técnico (0-1).', example: 0.4 })
+  @ApiProperty({ description: 'Peso del componente técnico (0-1).', example: 0.25 })
   w_technical: number
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @ApiProperty({ description: 'Peso del componente táctico (0-1).', example: 0.15 })
+  w_tactical: number
 
   @Type(() => Number)
   @IsNumber()

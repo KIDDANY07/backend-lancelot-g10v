@@ -19,8 +19,12 @@ export class ResponsePositionWeightProfileDto {
   w_physical: number
 
   @Expose()
-  @ApiProperty({ example: 0.4 })
+  @ApiProperty({ example: 0.25 })
   w_technical: number
+
+  @Expose()
+  @ApiProperty({ example: 0.15 })
+  w_tactical: number
 
   @Expose()
   @ApiProperty({ example: 0.2 })

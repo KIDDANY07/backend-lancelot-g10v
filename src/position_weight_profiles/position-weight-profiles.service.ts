@@ -21,16 +21,21 @@ export class PositionWeightProfilesService {
     private readonly positionWeightProfilesRepository: Repository<PositionWeightProfile>,
   ) {}
 
-  private validateWeightsSumToOne(
-    w_physical: number,
-    w_technical: number,
-    w_participation: number,
-  ) {
-    const sum = Number(w_physical) + Number(w_technical) + Number(w_participation)
+  private validateWeightsSumToOne(weights: {
+    w_physical: number
+    w_technical: number
+    w_tactical: number
+    w_participation: number
+  }) {
+    const sum =
+      Number(weights.w_physical) +
+      Number(weights.w_technical) +
+      Number(weights.w_tactical) +
+      Number(weights.w_participation)
     if (Math.abs(sum - 1) > WEIGHT_SUM_TOLERANCE)
       throw new BadRequestException({
         status: 'Error',
-        mensaje: `Los pesos w_physical + w_technical + w_participation deben sumar 1 (suma actual: ${sum.toFixed(2)})`,
+        mensaje: `Los pesos w_physical + w_technical + w_tactical + w_participation deben sumar 1 (suma actual: ${sum.toFixed(2)})`,
       })
   }
 
@@ -97,11 +102,7 @@ export class PositionWeightProfilesService {
   }
 
   async create(createPositionWeightProfileDto: CreatePositionWeightProfileDto) {
-    this.validateWeightsSumToOne(
-      createPositionWeightProfileDto.w_physical,
-      createPositionWeightProfileDto.w_technical,
-      createPositionWeightProfileDto.w_participation,
-    )
+    this.validateWeightsSumToOne(createPositionWeightProfileDto)
     const existing = await this.findByPositionAndAgeCategory(
       createPositionWeightProfileDto.position,
       createPositionWeightProfileDto.age_category,
@@ -137,11 +138,7 @@ export class PositionWeightProfilesService {
       profile,
       updatePositionWeightProfileDto,
     )
-    this.validateWeightsSumToOne(
-      updated.w_physical,
-      updated.w_technical,
-      updated.w_participation,
-    )
+    this.validateWeightsSumToOne(updated)
     await this.positionWeightProfilesRepository.save(updated)
     return {
       status: 'Success',

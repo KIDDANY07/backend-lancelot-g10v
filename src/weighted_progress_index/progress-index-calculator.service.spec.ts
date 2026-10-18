@@ -103,23 +103,56 @@ describe('ProgressIndexCalculatorService', () => {
   })
 
   describe('computeIndex', () => {
-    it('computes the weighted sum of the three components', () => {
-      const index = service.computeIndex(80, 60, 40, {
-        w_physical: 0.4,
-        w_technical: 0.4,
-        w_participation: 0.2,
-      })
-      // 80*0.4 + 60*0.4 + 40*0.2 = 32 + 24 + 8 = 64
+    it('computes the weighted sum of the four components', () => {
+      const index = service.computeIndex(
+        { physical: 80, technical: 60, tactical: 50, participation: 40 },
+        {
+          w_physical: 0.4,
+          w_technical: 0.25,
+          w_tactical: 0.15,
+          w_participation: 0.2,
+        },
+      )
+      expect(index).toBe(62.5)
+    })
+
+    it('ignores the tactical score when its weight is 0', () => {
+      const index = service.computeIndex(
+        { physical: 80, technical: 60, tactical: 10, participation: 40 },
+        {
+          w_physical: 0.4,
+          w_technical: 0.4,
+          w_tactical: 0,
+          w_participation: 0.2,
+        },
+      )
       expect(index).toBe(64)
     })
 
     it('clamps the result to the 0-100 range', () => {
-      const index = service.computeIndex(100, 100, 100, {
-        w_physical: 0.5,
-        w_technical: 0.5,
-        w_participation: 0.5,
-      })
+      const index = service.computeIndex(
+        { physical: 100, technical: 100, tactical: 100, participation: 100 },
+        {
+          w_physical: 0.5,
+          w_technical: 0.5,
+          w_tactical: 0.5,
+          w_participation: 0.5,
+        },
+      )
       expect(index).toBe(100)
+    })
+  })
+
+  describe('computeTacticalScore', () => {
+    it('scales the average of the tactical evaluations to 0-100', () => {
+      expect(service.computeTacticalScore([6, 7]).score).toBe(65)
+    })
+
+    it('warns when there are no tactical evaluations', () => {
+      expect(service.computeTacticalScore([])).toEqual({
+        score: 0,
+        warnings: ['Sin evaluaciones tácticas registradas en la temporada'],
+      })
     })
   })
 })

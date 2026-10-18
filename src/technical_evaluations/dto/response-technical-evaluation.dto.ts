@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { Expose, Transform } from 'class-transformer'
+import { EvaluationDimension } from '../evaluation-catalog'
 
 export class ResponseTechnicalEvaluationDto {
   @Expose()
@@ -27,7 +28,11 @@ export class ResponseTechnicalEvaluationDto {
   season_name: string
 
   @Expose()
-  @ApiProperty({ example: 'control_balon' })
+  @ApiProperty({ enum: EvaluationDimension })
+  dimension: EvaluationDimension
+
+  @Expose()
+  @ApiProperty({ example: 'Pase corto' })
   indicator: string
 
   @Expose()

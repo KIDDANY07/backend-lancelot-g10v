@@ -28,6 +28,9 @@ export class PositionWeightProfile {
   @Column({ type: 'decimal', precision: 3, scale: 2 })
   w_technical: number
 
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
+  w_tactical: number
+
   @Column({ type: 'decimal', precision: 3, scale: 2 })
   w_participation: number
 

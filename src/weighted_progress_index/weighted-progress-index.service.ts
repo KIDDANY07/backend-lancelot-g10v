@@ -14,6 +14,7 @@ import { PhysicalEvaluation } from 'src/physical_evaluations/entities/physical-e
 import { PositionWeightProfilesService } from 'src/position_weight_profiles/position-weight-profiles.service'
 import { SeasonsService } from 'src/seasons/seasons.service'
 import { TechnicalEvaluation } from 'src/technical_evaluations/entities/technical-evaluation.entity'
+import { EvaluationDimension } from 'src/technical_evaluations/evaluation-catalog'
 import { TrainingLoad } from 'src/training_loads/entities/training-load.entity'
 import { TrainingSession } from 'src/training_sessions/entities/training-session.entity'
 import { UsersService } from 'src/users/users.service'
@@ -244,14 +245,19 @@ export class WeightedProgressIndexService {
       cohortSpeed20m,
     })
 
-    // --- Technical score: average of the season's evaluations, scaled to 0-100 ---
-    const technicalEvaluations = await this.technicalEvaluationsRepository.find(
-      {
-        where: { id_user, id_season },
-      },
-    )
+    // --- Technical and tactical scores: average of each dimension's evaluations, scaled to 0-100 ---
+    const evaluations = await this.technicalEvaluationsRepository.find({
+      where: { id_user, id_season },
+    })
+    const scoresOf = (dimension: EvaluationDimension) =>
+      evaluations
+        .filter((evaluation) => evaluation.dimension === dimension)
+        .map((evaluation) => Number(evaluation.score))
     const technical = this.progressIndexCalculatorService.computeTechnicalScore(
-      technicalEvaluations.map((e) => Number(e.score)),
+      scoresOf(EvaluationDimension.TECNICA),
+    )
+    const tactical = this.progressIndexCalculatorService.computeTacticalScore(
+      scoresOf(EvaluationDimension.TACTICA),
     )
 
     // --- Participation score: training attendance + match-minutes ratios ---
@@ -303,15 +309,19 @@ export class WeightedProgressIndexService {
       )
 
     const index_value = this.progressIndexCalculatorService.computeIndex(
-      physical.score,
-      technical.score,
-      participation.score,
+      {
+        physical: physical.score,
+        technical: technical.score,
+        tactical: tactical.score,
+        participation: participation.score,
+      },
       profile,
     )
 
     const warnings = [
       ...physical.warnings,
       ...technical.warnings,
+      ...(Number(profile.w_tactical) > 0 ? tactical.warnings : []),
       ...participation.warnings,
     ]
 
@@ -325,6 +335,7 @@ export class WeightedProgressIndexService {
       id_profile: profile.id_profile,
       physical_score: physical.score,
       technical_score: technical.score,
+      tactical_score: tactical.score,
       participation_score: participation.score,
       index_value,
       warnings: warnings.length > 0 ? warnings : null,

@@ -38,6 +38,7 @@ function baseInput(
     cohort_size: 20,
     physical_score: 70,
     technical_score: 75,
+    tactical_score: 72,
     participation_score: 80,
     previous_index_value: 70,
     had_severe_injury: false,
@@ -113,6 +114,24 @@ describe('TalentDetectionRulesService', () => {
         TalentCriterionCode.MULTIDIMENSIONAL_PROFILE,
       )
       expect(result.flagged).toBe(false)
+    })
+
+    it('does not trigger when the tactical dimension is below the floor', () => {
+      const result = service.evaluate(
+        baseInput({ tactical_score: 30, percentile: 99 }),
+      )
+      expect(result.triggered_criteria).not.toContain(
+        TalentCriterionCode.MULTIDIMENSIONAL_PROFILE,
+      )
+      expect(result.criteria_text).toContain('táctico 30')
+    })
+
+    it('ignores the tactical dimension when the weight profile does not use it', () => {
+      const result = service.evaluate(baseInput({ tactical_score: null }))
+      expect(result.triggered_criteria).toContain(
+        TalentCriterionCode.MULTIDIMENSIONAL_PROFILE,
+      )
+      expect(result.criteria_text).not.toContain('táctico')
     })
 
     it('triggers when the weakest dimension is exactly min_dimension_score', () => {
@@ -333,7 +352,7 @@ describe('TalentDetectionRulesService', () => {
         'Percentil 90.00 del índice (78.00) en su cohorte (mínimo 80): cumple',
       )
       expect(criteria_text).toContain(
-        'físico 70.00; técnico 75.00; participación 80.00 (mínimo 40 en cada dimensión): cumple',
+        'físico 70.00; técnico 75.00; táctico 72.00; participación 80.00 (mínimo 40 en cada dimensión): cumple',
       )
       expect(criteria_text).toContain(
         'Mejora de +8.00 puntos frente a la temporada anterior (mínimo 5): cumple',
