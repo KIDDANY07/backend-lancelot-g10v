@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { AthletesInCategory } from 'src/athletes_in_categories/entities/athletes_in_category.entity'
+import { Category } from 'src/categories/entities/category.entity'
 import { DevelopmentObjective } from 'src/development_objectives/entities/development-objective.entity'
 import { FatigueAlert } from 'src/fatigue_alerts/entities/fatigue-alert.entity'
 import { InjuryRiskAssessment } from 'src/injury_risk_assessments/entities/injury-risk-assessment.entity'
@@ -26,6 +27,7 @@ import { ValidationReportService } from './validation-report.service'
   imports: [
     TypeOrmModule.forFeature([
       AthletesInCategory,
+      Category,
       PhysicalEvaluation,
       TechnicalEvaluation,
       DevelopmentObjective,

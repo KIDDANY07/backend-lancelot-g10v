@@ -3,6 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { plainToInstance } from 'class-transformer'
 import { In, Repository } from 'typeorm'
 import { AthletesInCategory } from 'src/athletes_in_categories/entities/athletes_in_category.entity'
+import { Category } from 'src/categories/entities/category.entity'
+import {
+  pickBaseAssignments,
+  referenceYearOf,
+  sportingAge,
+} from 'src/common/utils/sport-age.util'
 import { DevelopmentObjective } from 'src/development_objectives/entities/development-objective.entity'
 import { FatigueAlert } from 'src/fatigue_alerts/entities/fatigue-alert.entity'
 import { InjuryRiskAssessment } from 'src/injury_risk_assessments/entities/injury-risk-assessment.entity'
@@ -16,7 +22,11 @@ import { ResponseInjuryDto } from 'src/injuries/dto/response-injury.dto'
 import { ResponseWeightedProgressIndexDto } from 'src/weighted_progress_index/dto/response-weighted-progress-index.dto'
 import { ResponseTalentFlagDto } from 'src/talent_flags/dto/response-talent-flag.dto'
 import { SeasonsService } from 'src/seasons/seasons.service'
-import { TalentFlag } from 'src/talent_flags/entities/talent-flag.entity'
+import {
+  TalentFlag,
+  TalentFlagStatus,
+} from 'src/talent_flags/entities/talent-flag.entity'
+import { Season } from 'src/seasons/entities/season.entity'
 import { TechnicalEvaluation } from 'src/technical_evaluations/entities/technical-evaluation.entity'
 import { TrainingLoad } from 'src/training_loads/entities/training-load.entity'
 import { TrainingSession } from 'src/training_sessions/entities/training-session.entity'
@@ -30,6 +40,8 @@ export class ReportsService {
   constructor(
     @InjectRepository(AthletesInCategory)
     private readonly athletesInCategoryRepository: Repository<AthletesInCategory>,
+    @InjectRepository(Category)
+    private readonly categoriesRepository: Repository<Category>,
     @InjectRepository(PhysicalEvaluation)
     private readonly physicalEvaluationsRepository: Repository<PhysicalEvaluation>,
     @InjectRepository(TechnicalEvaluation)
@@ -240,6 +252,11 @@ export class ReportsService {
           id_user: athlete.id_user,
           name: athlete.name,
           lastname: athlete.lastname,
+          birth_date: athlete.birth_date ?? null,
+          sporting_age: sportingAge(
+            athlete.birth_date,
+            referenceYearOf(season.start_date),
+          ),
           position: athInCat?.position ?? null,
           category: athInCat?.category?.name ?? null,
           categories: assignments.map((assignment) => ({
@@ -330,6 +347,145 @@ export class ReportsService {
         participation_score: index.participation_score,
         index_value: index.index_value,
       })),
+    }
+  }
+
+  private average(values: number[]) {
+    if (values.length === 0) return null
+    const sum = values.reduce((total, value) => total + value, 0)
+    return Math.round((sum / values.length) * 100) / 100
+  }
+
+  async getCategoryEvolution(id_category: number) {
+    const category = await this.categoriesRepository.findOne({
+      where: { id_category },
+    })
+    if (!category)
+      throw new NotFoundException({
+        status: 'Error',
+        mensaje: 'No existe esta categoría',
+      })
+
+    const categoryAssignments = await this.athletesInCategoryRepository
+      .createQueryBuilder('assignment')
+      .where('assignment.id_category = :id_category', { id_category })
+      .andWhere('assignment.id_season IS NOT NULL')
+      .getMany()
+    const seasonIds = [
+      ...new Set(categoryAssignments.map((a) => Number(a.id_season))),
+    ]
+    const userIds = [...new Set(categoryAssignments.map((a) => a.id_user))]
+    const categoryInfo = {
+      id_category: category.id_category,
+      name: category.name,
+      min_age: category.min_age,
+      max_age: category.max_age,
+    }
+
+    if (seasonIds.length === 0)
+      return {
+        status: 'Success',
+        mensaje: `La categoría ${category.name} aún no tiene deportistas asignados en ninguna temporada`,
+        category: categoryInfo,
+        evolution: [],
+      }
+
+    const [assignments, categories, indices, flags, seasons] =
+      await Promise.all([
+        this.athletesInCategoryRepository.find({
+          where: { id_season: In(seasonIds), id_user: In(userIds) },
+        }),
+        this.categoriesRepository.find(),
+        this.weightedProgressIndexRepository.find({
+          where: { id_season: In(seasonIds), id_user: In(userIds) },
+          relations: { profile: true },
+        }),
+        this.talentFlagsRepository.find({
+          where: { id_season: In(seasonIds), id_user: In(userIds) },
+        }),
+        Promise.all(
+          seasonIds.map((id_season) =>
+            this.seasonsService.findOneById(id_season),
+          ),
+        ),
+      ])
+
+    const maxAgeById = new Map(
+      categories.map((item) => [item.id_category, Number(item.max_age)]),
+    )
+    const baseByUserSeason = pickBaseAssignments(
+      assignments,
+      (assignment) => maxAgeById.get(assignment.id_category) ?? Infinity,
+      (assignment) => `${assignment.id_user}:${assignment.id_season}`,
+    )
+
+    const evolution = seasons
+      .filter((season): season is Season => season !== null)
+      .sort((a, b) => a.start_date.localeCompare(b.start_date))
+      .map((season) => {
+        const members = categoryAssignments.filter(
+          (assignment) => Number(assignment.id_season) === season.id_season,
+        )
+        const baseUsers = new Set(
+          members
+            .filter(
+              (assignment) =>
+                baseByUserSeason.get(
+                  `${assignment.id_user}:${season.id_season}`,
+                )?.id_category === id_category,
+            )
+            .map((assignment) => assignment.id_user),
+        )
+        const guests = new Set(
+          members
+            .map((assignment) => assignment.id_user)
+            .filter((id_user) => !baseUsers.has(id_user)),
+        )
+        const seasonIndices = indices.filter(
+          (index) =>
+            index.id_season === season.id_season &&
+            baseUsers.has(index.id_user),
+        )
+        const seasonFlags = flags.filter(
+          (flag) =>
+            flag.id_season === season.id_season && baseUsers.has(flag.id_user),
+        )
+        const scores = (
+          key:
+            | 'index_value'
+            | 'physical_score'
+            | 'technical_score'
+            | 'participation_score',
+        ) => seasonIndices.map((index) => Number(index[key]))
+        return {
+          id_season: season.id_season,
+          season_name: season.name,
+          start_date: season.start_date,
+          status: season.status,
+          athletes: baseUsers.size,
+          guests: guests.size,
+          indexed: seasonIndices.length,
+          index_value: this.average(scores('index_value')),
+          physical_score: this.average(scores('physical_score')),
+          technical_score: this.average(scores('technical_score')),
+          tactical_score: this.average(
+            seasonIndices
+              .filter((index) => Number(index.profile?.w_tactical ?? 0) > 0)
+              .map((index) => Number(index.tactical_score)),
+          ),
+          participation_score: this.average(scores('participation_score')),
+          talent_flags: seasonFlags.length,
+          reviewed_talent_flags: seasonFlags.filter(
+            (flag) => flag.status === TalentFlagStatus.REVIEWED,
+          ).length,
+        }
+      })
+
+    return {
+      status: 'Success',
+      mensaje: `Evolución de ${category.name} en ${evolution.length} temporadas`,
+      category: categoryInfo,
+      evolution,
     }
   }
 }

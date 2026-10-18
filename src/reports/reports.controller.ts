@@ -63,6 +63,16 @@ export class ReportsController {
     return this.reportsService.getSeasonComparison(id_user)
   }
 
+  @Get('category-evolution/:id_category')
+  @ApiOperation({
+    summary:
+      'Evolución de una categoría a lo largo de las temporadas: deportistas, promedio del índice y de cada dimensión, y señalizaciones de talento',
+  })
+  @ApiParam({ name: 'id_category', type: Number })
+  categoryEvolution(@Param('id_category', ParseIntPipe) id_category: number) {
+    return this.reportsService.getCategoryEvolution(id_category)
+  }
+
   @Get('season-summary/:id_user/:id_season')
   @ApiOperation({
     summary: 'Resumen completo de un deportista en una temporada específica',
