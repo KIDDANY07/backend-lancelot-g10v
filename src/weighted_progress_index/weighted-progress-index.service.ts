@@ -25,7 +25,9 @@ import { TrainingLoad } from 'src/training_loads/entities/training-load.entity'
 import { TrainingSession } from 'src/training_sessions/entities/training-session.entity'
 import { UsersService } from 'src/users/users.service'
 import { extractErrorMessage } from 'src/common/utils/error-message.util'
+import { pickBaseAssignments } from 'src/common/utils/sport-age.util'
 import { FilterWeightedProgressIndexDto } from './dto/filter-weighted-progress-index.dto'
+import { RankingWeightedProgressIndexDto } from './dto/ranking-weighted-progress-index.dto'
 import { ResponseWeightedProgressIndexDto } from './dto/response-weighted-progress-index.dto'
 import { WeightedProgressIndex } from './entities/weighted-progress-index.entity'
 import {
@@ -33,6 +35,10 @@ import {
   MatchAppearance,
   ProgressIndexCalculatorService,
 } from './progress-index-calculator.service'
+
+function personName(person?: { name?: string; lastname?: string } | null) {
+  return `${person?.name ?? ''} ${person?.lastname ?? ''}`.trim()
+}
 
 @Injectable()
 export class WeightedProgressIndexService {
@@ -97,6 +103,73 @@ export class WeightedProgressIndexService {
     }
   }
 
+  async ranking({
+    id_season,
+    id_category,
+    page = 1,
+    limit = 10,
+  }: RankingWeightedProgressIndexDto) {
+    const [indices, assignments] = await Promise.all([
+      this.weightedProgressIndexRepository.find({
+        where: { id_season },
+        relations: { athlete: true },
+      }),
+      this.athletesInCategoryRepository.find({
+        where: { id_season },
+        relations: { user: true, category: true },
+      }),
+    ])
+    const baseByUser = pickBaseAssignments(assignments, (assignment) =>
+      Number(assignment.category?.max_age ?? Infinity),
+    )
+    const inScope = (categoryId: number | undefined) =>
+      !id_category || categoryId === id_category
+
+    const entries = indices
+      .map((index) => {
+        const base = baseByUser.get(index.id_user)
+        return {
+          index,
+          athlete_name:
+            personName(index.athlete) || personName(base?.user) || 'Deportista',
+          id_category: base?.id_category ?? null,
+          category_name: base?.category?.name ?? null,
+          position: base?.position ?? null,
+        }
+      })
+      .filter((entry) => inScope(entry.id_category ?? undefined))
+      .sort(
+        (first, second) =>
+          Number(second.index.index_value) - Number(first.index.index_value) ||
+          first.athlete_name.localeCompare(second.athlete_name, 'es'),
+      )
+
+    const indexed = new Set(indices.map((index) => index.id_user))
+    const missing = [...baseByUser.values()].filter(
+      (assignment) =>
+        !indexed.has(assignment.id_user) && inScope(assignment.id_category),
+    )
+    const total = entries.length
+    const offset = (page - 1) * limit
+
+    return {
+      status: 'Success',
+      mensaje: 'Ranking de índices de progreso de la temporada',
+      ranking: entries.slice(offset, offset + limit).map((entry, position) => ({
+        ...entry,
+        rank: offset + position + 1,
+        index: plainToInstance(ResponseWeightedProgressIndexDto, entry.index, {
+          excludeExtraneousValues: true,
+        }),
+      })),
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      missing: {
+        total: missing.length,
+        first: missing[0] ? personName(missing[0].user) : null,
+      },
+    }
+  }
+
   async getById(id_index: number) {
     const index = await this.findOneById(id_index)
     if (!index)
@@ -136,18 +209,28 @@ export class WeightedProgressIndexService {
 
     const assignments = await this.athletesInCategoryRepository.find({
       where: { id_season },
-      select: { id_user: true },
+      relations: { user: true },
     })
-    const userIds = [...new Set(assignments.map((a) => a.id_user))]
+    const names = new Map(
+      assignments.map((assignment) => [
+        assignment.id_user,
+        personName(assignment.user),
+      ]),
+    )
 
     let recalculated = 0
-    const failed: { id_user: number; mensaje: string }[] = []
-    for (const id_user of userIds) {
+    const failed: { id_user: number; athlete_name: string; mensaje: string }[] =
+      []
+    for (const [id_user, athlete_name] of names) {
       try {
         await this.calculateForAthleteSeason(id_user, id_season)
         recalculated++
       } catch (error) {
-        failed.push({ id_user, mensaje: extractErrorMessage(error) })
+        failed.push({
+          id_user,
+          athlete_name,
+          mensaje: extractErrorMessage(error),
+        })
       }
     }
 

@@ -32,6 +32,8 @@ import { TrainingLoad } from 'src/training_loads/entities/training-load.entity'
 import { TrainingSession } from 'src/training_sessions/entities/training-session.entity'
 import { UsersService } from 'src/users/users.service'
 import { WeightedProgressIndex } from 'src/weighted_progress_index/entities/weighted-progress-index.entity'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
+import { paginateList } from 'src/common/utils/pagination.util'
 
 const STANDARD_MATCH_MINUTES = 90
 
@@ -356,7 +358,10 @@ export class ReportsService {
     return Math.round((sum / values.length) * 100) / 100
   }
 
-  async getCategoryEvolution(id_category: number) {
+  async getCategoryEvolution(
+    id_category: number,
+    pageQuery: PageQueryDto = {},
+  ) {
     const category = await this.categoriesRepository.findOne({
       where: { id_category },
     })
@@ -388,6 +393,7 @@ export class ReportsService {
         mensaje: `La categoría ${category.name} aún no tiene deportistas asignados en ninguna temporada`,
         category: categoryInfo,
         evolution: [],
+        pagination: paginateList([], pageQuery).pagination,
       }
 
     const [assignments, categories, indices, flags, seasons] =
@@ -481,11 +487,13 @@ export class ReportsService {
         }
       })
 
+    const { items, pagination } = paginateList(evolution, pageQuery)
     return {
       status: 'Success',
       mensaje: `Evolución de ${category.name} en ${evolution.length} temporadas`,
       category: categoryInfo,
-      evolution,
+      evolution: items,
+      pagination,
     }
   }
 }

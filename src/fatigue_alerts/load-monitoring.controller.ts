@@ -71,6 +71,10 @@ export class LoadMonitoringController {
     @Param('id_category', ParseIntPipe) id_category: number,
     @Query() query: CategoryAcwrQueryDto,
   ) {
-    return this.loadMonitoringService.getCategoryAcwr(id_category, query.date)
+    return this.loadMonitoringService.getCategoryAcwr(
+      id_category,
+      query.date,
+      query,
+    )
   }
 }

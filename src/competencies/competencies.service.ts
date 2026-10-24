@@ -36,6 +36,7 @@ export class CompetenciesService {
       limit = 10,
       name,
       id_season,
+      id_category,
       start_date,
       finish_date,
     } = filters
@@ -53,7 +54,12 @@ export class CompetenciesService {
       ])
       .skip(skip)
       .take(limit)
-      .orderBy('competency.id_competency', 'ASC')
+      .orderBy('competency.start_date', 'DESC')
+      .addOrderBy('competency.id_competency', 'DESC')
+
+    if (id_category) {
+      query.andWhere('competency.id_category = :id_category', { id_category })
+    }
 
     if (name) {
       query.andWhere('competency.name ILIKE :name', { name: `%${name}%` })

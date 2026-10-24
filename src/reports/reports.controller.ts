@@ -22,6 +22,7 @@ import { User } from 'src/users/entities/user.entity'
 import { ValidationReportQueryDto } from './dto/validation-report-query.dto'
 import { ReportsService } from './reports.service'
 import { ValidationReportService } from './validation-report.service'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR')
@@ -69,8 +70,12 @@ export class ReportsController {
       'Evolución de una categoría a lo largo de las temporadas: deportistas, promedio del índice y de cada dimensión, y señalizaciones de talento',
   })
   @ApiParam({ name: 'id_category', type: Number })
-  categoryEvolution(@Param('id_category', ParseIntPipe) id_category: number) {
-    return this.reportsService.getCategoryEvolution(id_category)
+  @ApiQuery({ type: PageQueryDto })
+  categoryEvolution(
+    @Param('id_category', ParseIntPipe) id_category: number,
+    @Query() query: PageQueryDto,
+  ) {
+    return this.reportsService.getCategoryEvolution(id_category, query)
   }
 
   @Get('season-summary/:id_user/:id_season')

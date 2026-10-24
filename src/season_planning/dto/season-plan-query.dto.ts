@@ -1,8 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import { IsInt, IsOptional, Min } from 'class-validator'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
 
-export class SeasonPlanQueryDto {
+export class SeasonPlanQueryDto extends PageQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()

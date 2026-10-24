@@ -1,61 +1,55 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
-  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
-  IsString,
-  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator'
 
-export class PlannedAthleteDto {
+export class PlanOverrideDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @ApiProperty({ description: 'Id del deportista.', example: 7 })
   id_user: number
 
+  @IsOptional()
+  @IsBoolean()
+  @ApiPropertyOptional({
+    description: 'Si se incluye en el plan.',
+    example: true,
+  })
+  include?: boolean
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Categoría base del deportista en la temporada destino.',
     example: 2,
   })
-  id_category: number
+  id_category?: number
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @ApiPropertyOptional({
-    description:
-      'Categoría superior en la que también entrenará, por ejemplo tras una señalización de talento revisada.',
-    example: 3,
-  })
-  id_promotion_category?: number | null
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  @ApiPropertyOptional({
-    description:
-      'Posición en la temporada destino. Si se omite se conserva la de la temporada de origen.',
-    example: 'Delantero',
-  })
-  position?: string | null
-
   @IsBoolean()
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
-      'Si es verdadero, los objetivos en curso se copian a la temporada destino.',
+      'Si también entrenará en la categoría de ascenso sugerida por una señalización de talento revisada.',
     example: true,
   })
-  carry_objectives: boolean
+  promote?: boolean
+
+  @IsOptional()
+  @IsBoolean()
+  @ApiPropertyOptional({
+    description: 'Si se copian sus objetivos en curso a la temporada destino.',
+    example: true,
+  })
+  carry?: boolean
 }
 
 export class ApplySeasonPlanDto {
@@ -65,10 +59,14 @@ export class ApplySeasonPlanDto {
   @ApiProperty({ description: 'Temporada del siguiente ciclo.', example: 2 })
   id_target_season: number
 
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => PlannedAthleteDto)
-  @ApiProperty({ type: [PlannedAthleteDto] })
-  athletes: PlannedAthleteDto[]
+  @Type(() => PlanOverrideDto)
+  @ApiPropertyOptional({
+    description:
+      'Cambios sobre la decisión sugerida. Los deportistas que no aparecen se aplican con la sugerencia del plan.',
+    type: [PlanOverrideDto],
+  })
+  overrides?: PlanOverrideDto[]
 }

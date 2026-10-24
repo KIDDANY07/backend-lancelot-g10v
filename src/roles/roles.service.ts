@@ -16,6 +16,8 @@ import {
   assertNoReferences,
   countReferences,
 } from 'src/common/utils/delete-guard.util'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
+import { paginateList } from 'src/common/utils/pagination.util'
 
 @Injectable()
 export class RolesService implements OnApplicationBootstrap {
@@ -74,8 +76,15 @@ export class RolesService implements OnApplicationBootstrap {
     return this.rolesRepository.save(createRoleDto)
   }
 
-  async findAll() {
-    return this.rolesRepository.find({ order: { id_role: 'ASC' } })
+  async findAll({ page = 1, limit }: PageQueryDto = {}) {
+    const roles = await this.rolesRepository.find({ order: { id_role: 'ASC' } })
+    const { items, pagination } = paginateList(roles, { page, limit })
+    return {
+      status: 'Success',
+      mensaje: 'Consulta de roles exitosa',
+      roles: items,
+      pagination,
+    }
   }
 
   async findOne(id_role: number) {

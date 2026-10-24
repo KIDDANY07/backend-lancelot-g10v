@@ -40,8 +40,49 @@ export interface FocusSuggestion {
   score: number
 }
 
+export interface PlanDecision {
+  include: boolean
+  id_category: number | null
+  promote: boolean
+  carry: boolean
+}
+
+export interface PlanDecisionInput {
+  suggested_category: { id_category: number } | null
+  promotion_category: { id_category: number } | null
+  open_objectives: unknown[]
+  planned_categories: string[]
+}
+
 @Injectable()
 export class SeasonPlanningRulesService {
+  defaultDecision(athlete: PlanDecisionInput): PlanDecision {
+    return {
+      include:
+        athlete.suggested_category !== null &&
+        athlete.planned_categories.length === 0,
+      id_category: athlete.suggested_category?.id_category ?? null,
+      promote: athlete.promotion_category !== null,
+      carry: athlete.open_objectives.length > 0,
+    }
+  }
+
+  resolveDecision(
+    defaults: PlanDecision,
+    override?: Partial<PlanDecision>,
+  ): PlanDecision {
+    return {
+      include: override?.include ?? defaults.include,
+      id_category: override?.id_category ?? defaults.id_category,
+      promote: override?.promote ?? defaults.promote,
+      carry: override?.carry ?? defaults.carry,
+    }
+  }
+
+  isApplicable(decision: PlanDecision) {
+    return decision.include && decision.id_category !== null
+  }
+
   eligibleCategories(age: number, categories: PlanCategoryInfo[]) {
     return eligibleCategoriesFor(age, categories)
   }

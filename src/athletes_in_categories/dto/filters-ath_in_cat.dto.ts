@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer'
-import { IsInt, IsOptional, IsString, Min } from 'class-validator'
+import { Transform, Type } from 'class-transformer'
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
 export class FilterAthInCat {
@@ -22,6 +22,24 @@ export class FilterAthInCat {
   @IsInt()
   @ApiPropertyOptional({ example: 2 })
   id_category?: number
+
+  @IsOptional()
+  @IsString()
+  @ApiPropertyOptional({
+    description:
+      'Busca cada palabra en el nombre o el apellido del deportista, sin distinguir tildes ni mayúsculas.',
+    example: 'juan perez',
+  })
+  search?: string
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  @ApiPropertyOptional({
+    description: 'Solo asignaciones sin posición registrada.',
+    example: true,
+  })
+  missing_position?: boolean
 
   @IsOptional()
   @IsString()

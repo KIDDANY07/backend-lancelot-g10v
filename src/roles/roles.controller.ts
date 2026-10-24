@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common'
 import { RolesService } from './roles.service'
@@ -19,9 +20,11 @@ import {
   ApiInternalServerErrorResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('roles')
@@ -45,13 +48,10 @@ export class RolesController {
 
   @Roles('ADMIN')
   @Get()
-  @ApiOperation({
-    summary: 'Listar roles',
-    description: 'Endpoint scaffold público que devuelve texto.',
-  })
-  @ApiResponse({ status: 200, type: String })
-  findAll() {
-    return this.rolesService.findAll()
+  @ApiOperation({ summary: 'Listar roles paginados' })
+  @ApiQuery({ type: PageQueryDto })
+  findAll(@Query() query: PageQueryDto) {
+    return this.rolesService.findAll(query)
   }
 
   @Roles('ADMIN')

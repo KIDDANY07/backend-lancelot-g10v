@@ -11,6 +11,8 @@ import { UsersService } from 'src/users/users.service'
 import { CHRONIC_WINDOW_DAYS } from './acwr-calculator.service'
 import { LoadRecordsService } from './load-records.service'
 import { LoadSeriesService } from './load-series.service'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
+import { paginateList } from 'src/common/utils/pagination.util'
 
 export const DEFAULT_SERIES_DAYS = 90
 export const MAX_SERIES_DAYS = 366
@@ -87,7 +89,11 @@ export class LoadMonitoringService {
     }
   }
 
-  async getCategoryAcwr(id_category: number, dateInput?: string) {
+  async getCategoryAcwr(
+    id_category: number,
+    dateInput?: string,
+    pageQuery: PageQueryDto = {},
+  ) {
     const category = await this.categoriesService.findOneById(id_category)
     if (!category)
       throw new NotFoundException({
@@ -107,6 +113,7 @@ export class LoadMonitoringService {
         date,
         thresholds,
         athletes: [],
+        pagination: paginateList([], pageQuery).pagination,
       }
 
     const weekStart = addDaysToKey(date, -6)
@@ -141,6 +148,7 @@ export class LoadMonitoringService {
         ((b.acwr as number | null) ?? -1) - ((a.acwr as number | null) ?? -1),
     )
 
+    const { items, pagination } = paginateList(athletes, pageQuery)
     return {
       status: 'Success',
       mensaje: 'Consulta del ACWR de la categoría exitosa',
@@ -148,7 +156,8 @@ export class LoadMonitoringService {
       season: { id_season: season.id_season, name: season.name },
       date,
       thresholds,
-      athletes,
+      athletes: items,
+      pagination,
     }
   }
 }

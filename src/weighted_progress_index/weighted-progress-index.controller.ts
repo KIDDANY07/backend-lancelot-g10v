@@ -20,6 +20,7 @@ import { Roles } from 'src/auth/decorators/roles.decorator'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 import { FilterWeightedProgressIndexDto } from './dto/filter-weighted-progress-index.dto'
+import { RankingWeightedProgressIndexDto } from './dto/ranking-weighted-progress-index.dto'
 import { RecalculateWeightedProgressIndexDto } from './dto/recalculate-weighted-progress-index.dto'
 import { ResponseWeightedProgressIndexDto } from './dto/response-weighted-progress-index.dto'
 import { WeightedProgressIndexService } from './weighted-progress-index.service'
@@ -39,6 +40,16 @@ export class WeightedProgressIndexController {
   @ApiQuery({ type: FilterWeightedProgressIndexDto })
   findAll(@Query() filters: FilterWeightedProgressIndexDto) {
     return this.weightedProgressIndexService.findAll(filters)
+  }
+
+  @Get('ranking')
+  @ApiOperation({
+    summary:
+      'Ranking paginado de la temporada por índice, con la categoría base de cada deportista y cuántos aún no tienen índice',
+  })
+  @ApiQuery({ type: RankingWeightedProgressIndexDto })
+  ranking(@Query() filters: RankingWeightedProgressIndexDto) {
+    return this.weightedProgressIndexService.ranking(filters)
   }
 
   @Get('id/:id')

@@ -132,4 +132,45 @@ describe('SeasonPlanningRulesService', () => {
       )
     })
   })
+
+  describe('decisión del plan', () => {
+    const athlete = {
+      suggested_category: { id_category: 2 },
+      promotion_category: { id_category: 3 },
+      open_objectives: [{ id_objective: 1 }],
+      planned_categories: [],
+    }
+
+    it('sugiere incluir, ascender y llevar objetivos cuando corresponde', () => {
+      expect(service.defaultDecision(athlete)).toEqual({
+        include: true,
+        id_category: 2,
+        promote: true,
+        carry: true,
+      })
+    })
+
+    it('no incluye por defecto a quien ya tiene categoría en el destino', () => {
+      expect(
+        service.defaultDecision({ ...athlete, planned_categories: ['Sub-15'] })
+          .include,
+      ).toBe(false)
+    })
+
+    it('aplica solo los campos que cambió el usuario', () => {
+      const defaults = service.defaultDecision(athlete)
+      expect(
+        service.resolveDecision(defaults, {
+          include: undefined,
+          id_category: 3,
+          promote: false,
+        }),
+      ).toEqual({ include: true, id_category: 3, promote: false, carry: true })
+      expect(
+        service.isApplicable(
+          service.resolveDecision(defaults, { include: false }),
+        ),
+      ).toBe(false)
+    })
+  })
 })

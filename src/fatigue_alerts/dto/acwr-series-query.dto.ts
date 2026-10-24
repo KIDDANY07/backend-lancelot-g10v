@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { IsDateString, IsOptional, Matches } from 'class-validator'
+import { PageQueryDto } from 'src/common/dto/page-query.dto'
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 const DATE_KEY_MESSAGE = 'La fecha debe tener el formato YYYY-MM-DD'
@@ -26,7 +27,7 @@ export class AcwrSeriesQueryDto {
   to?: string
 }
 
-export class CategoryAcwrQueryDto {
+export class CategoryAcwrQueryDto extends PageQueryDto {
   @IsOptional()
   @IsDateString()
   @Matches(DATE_KEY, { message: DATE_KEY_MESSAGE })

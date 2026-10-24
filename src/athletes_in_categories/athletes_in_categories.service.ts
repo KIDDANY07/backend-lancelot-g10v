@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { applyWordSearch } from 'src/common/utils/search.util'
 import { ROLE_IDS } from 'src/roles/role-codes'
 import { CreateAthletesInCategoryDto } from './dto/create-athletes_in_category.dto'
 import { UpdateAthletesInCategoryDto } from './dto/update-athletes_in_category.dto'
@@ -132,6 +133,8 @@ export class AthletesInCategoriesService {
       id_category,
       category_name,
       id_season,
+      search,
+      missing_position,
     } = filters
 
     const skip = (page - 1) * limit
@@ -144,7 +147,18 @@ export class AthletesInCategoriesService {
       .addSelect(['category.id_category', 'category.name'])
       .skip(skip)
       .take(limit)
-      .orderBy('user.id_user', 'ASC')
+      .orderBy('category.name', 'ASC')
+      .addOrderBy('user.lastname', 'ASC')
+      .addOrderBy('user.name', 'ASC')
+      .addOrderBy('athlete_in_category.id_ath_cat', 'ASC')
+
+    applyWordSearch(query, ['user.name', 'user.lastname'], search)
+
+    if (missing_position) {
+      query.andWhere(
+        "(athlete_in_category.position IS NULL OR athlete_in_category.position = '')",
+      )
+    }
 
     if (name) {
       query.andWhere('user.name ILIKE :name', { name: `%${name}%` })

@@ -36,6 +36,7 @@ export class MatchesService {
       limit = 10,
       id_category,
       id_competency,
+      id_season,
       name_category,
       name_competency,
       location,
@@ -47,9 +48,15 @@ export class MatchesService {
       .createQueryBuilder('match')
       .leftJoinAndSelect('match.competency', 'competency')
       .leftJoinAndSelect('match.category', 'category')
-      .orderBy('match.id_match', 'ASC')
+      .orderBy('match.date', 'DESC')
+      .addOrderBy('match.time', 'DESC')
+      .addOrderBy('match.id_match', 'DESC')
       .skip(skip)
       .take(limit)
+
+    if (id_season) {
+      query.andWhere('competency.id_season = :id_season', { id_season })
+    }
 
     if (id_competency) {
       query.andWhere('competency.id_competency = :id_competency', {

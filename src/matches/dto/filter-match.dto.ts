@@ -43,6 +43,17 @@ export class FilterMatchDto {
   @IsInt()
   @Min(1)
   @ApiPropertyOptional({
+    description: 'Solo partidos de competencias de esta temporada.',
+    example: 1,
+    minimum: 1,
+  })
+  id_season?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @ApiPropertyOptional({
     description: 'Identificador exacto de la competencia.',
     example: 1,
     minimum: 1,

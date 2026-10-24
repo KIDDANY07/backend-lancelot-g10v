@@ -40,7 +40,9 @@ export class CategoriesService {
       ])
       .skip(skip)
       .take(limit)
-      .orderBy('category.id_category', 'ASC')
+      .orderBy('category.min_age', 'ASC')
+      .addOrderBy('category.max_age', 'ASC')
+      .addOrderBy('category.id_category', 'ASC')
 
     if (name) {
       query.andWhere('category.name ILIKE :name', { name: `%${name}%` })

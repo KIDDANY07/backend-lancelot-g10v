@@ -35,6 +35,15 @@ export class FilterCompetency {
   id_season?: number
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @ApiPropertyOptional({
+    description: 'Filtrar por id de categoría.',
+    example: 2,
+  })
+  id_category?: number
+
+  @IsOptional()
   @Type(() => Date)
   @IsDate()
   @ApiPropertyOptional({

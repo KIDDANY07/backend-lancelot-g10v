@@ -31,6 +31,8 @@ import {
   PlanCategoryInfo,
   SeasonPlanningRulesService,
 } from './season-planning-rules.service'
+import { SeasonPlanQueryDto } from './dto/season-plan-query.dto'
+import { paginateList } from 'src/common/utils/pagination.util'
 
 @Injectable()
 export class SeasonPlanningService {
@@ -136,7 +138,7 @@ export class SeasonPlanningService {
     }
   }
 
-  async getPlan(id_season: number, id_target_season?: number) {
+  private async buildPlan(id_season: number, id_target_season?: number) {
     const source = await this.findSeasonOrFail(id_season)
     const target = await this.resolveTarget(source, id_target_season)
     const referenceYear = target
@@ -220,7 +222,7 @@ export class SeasonPlanningService {
         age === null
           ? []
           : this.seasonPlanningRulesService.eligibleCategories(age, categories)
-      return {
+      const athlete = {
         id_user: assignment.id_user,
         name: assignment.user?.name ?? '',
         lastname: assignment.user?.lastname ?? '',
@@ -256,6 +258,11 @@ export class SeasonPlanningService {
         ),
         planned_categories: plannedByUser.get(assignment.id_user) ?? [],
       }
+      return {
+        ...athlete,
+        default_decision:
+          this.seasonPlanningRulesService.defaultDecision(athlete),
+      }
     })
 
     athletes.sort((a, b) => {
@@ -268,6 +275,15 @@ export class SeasonPlanningService {
       )
     })
 
+    return { source, target, referenceYear, athletes }
+  }
+
+  async getPlan(id_season: number, query: SeasonPlanQueryDto = {}) {
+    const { source, target, referenceYear, athletes } = await this.buildPlan(
+      id_season,
+      query.id_target_season,
+    )
+    const { items, pagination } = paginateList(athletes, query)
     return {
       status: 'Success',
       mensaje: target
@@ -277,8 +293,14 @@ export class SeasonPlanningService {
         source: this.seasonSummary(source),
         target: this.seasonSummary(target),
         reference_year: referenceYear,
-        athletes,
+        athletes: items,
+        default_applicable: athletes.filter((athlete) =>
+          this.seasonPlanningRulesService.isApplicable(
+            athlete.default_decision,
+          ),
+        ).length,
       },
+      pagination,
     }
   }
 
@@ -306,11 +328,11 @@ export class SeasonPlanningService {
     applySeasonPlanDto: ApplySeasonPlanDto,
     requested_by: number | null,
   ) {
-    const source = await this.findSeasonOrFail(id_season)
-    const target = await this.resolveTarget(
-      source,
+    const plan = await this.buildPlan(
+      id_season,
       applySeasonPlanDto.id_target_season,
     )
+    const { source, target } = plan
     if (!target)
       throw new BadRequestException({
         status: 'Error',
@@ -322,9 +344,46 @@ export class SeasonPlanningService {
         mensaje: `${target.name} está cerrada; elige una temporada planeada o activa`,
       })
 
+    const overrides = new Map(
+      (applySeasonPlanDto.overrides ?? []).map((override) => [
+        override.id_user,
+        override,
+      ]),
+    )
+    const names = new Map(
+      plan.athletes.map((athlete) => [
+        athlete.id_user,
+        `${athlete.name} ${athlete.lastname}`.trim(),
+      ]),
+    )
+    const items = plan.athletes.flatMap((athlete) => {
+      const decision = this.seasonPlanningRulesService.resolveDecision(
+        athlete.default_decision,
+        overrides.get(athlete.id_user),
+      )
+      if (!this.seasonPlanningRulesService.isApplicable(decision)) return []
+      return [
+        {
+          id_user: athlete.id_user,
+          id_category: decision.id_category as number,
+          id_promotion_category:
+            decision.promote && athlete.promotion_category
+              ? athlete.promotion_category.id_category
+              : null,
+          carry_objectives:
+            decision.carry && athlete.open_objectives.length > 0,
+        },
+      ]
+    })
+    if (items.length === 0)
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'El plan no tiene deportistas para aplicar',
+      })
+
     const categories = await this.loadCategories()
     const baseByUser = await this.loadSourceAssignments(id_season, categories)
-    const requestedIds = applySeasonPlanDto.athletes.map((item) => item.id_user)
+    const requestedIds = items.map((item) => item.id_user)
     const objectives = await this.loadOpenObjectives(
       id_season,
       requestedIds.filter((id) => baseByUser.has(id)),
@@ -343,18 +402,21 @@ export class SeasonPlanningService {
     let assigned = 0
     let skipped = 0
     let objectivesCarried = 0
-    const failed: { id_user: number; mensaje: string }[] = []
+    const failed: { id_user: number; athlete_name: string; mensaje: string }[] =
+      []
 
-    for (const item of applySeasonPlanDto.athletes) {
+    for (const item of items) {
+      const athlete_name = names.get(item.id_user) ?? ''
       const base = baseByUser.get(item.id_user)
       if (!base) {
         failed.push({
           id_user: item.id_user,
+          athlete_name,
           mensaje: `No estaba asignado en ${source.name}`,
         })
         continue
       }
-      const position = item.position ?? base.position ?? null
+      const position = base.position ?? null
       try {
         const categoryIds = [
           item.id_category,
@@ -398,7 +460,7 @@ export class SeasonPlanningService {
         }
       } catch (error) {
         const mensaje = extractErrorMessage(error)
-        failed.push({ id_user: item.id_user, mensaje })
+        failed.push({ id_user: item.id_user, athlete_name, mensaje })
         this.logger.error(
           `Error al planificar el siguiente ciclo del deportista ${item.id_user}: ${mensaje}`,
         )

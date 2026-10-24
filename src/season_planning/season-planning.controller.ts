@@ -43,7 +43,7 @@ export class SeasonPlanningController {
     @Param('id_season', ParseIntPipe) id_season: number,
     @Query() query: SeasonPlanQueryDto,
   ) {
-    return this.seasonPlanningService.getPlan(id_season, query.id_target_season)
+    return this.seasonPlanningService.getPlan(id_season, query)
   }
 
   @Post(':id_season/apply')
