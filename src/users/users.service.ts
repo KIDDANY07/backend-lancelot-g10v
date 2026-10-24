@@ -9,7 +9,7 @@ import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { User } from './entities/user.entity'
-import { Repository } from 'typeorm'
+import { Repository, SelectQueryBuilder } from 'typeorm'
 import { FilterUserDto } from './dto/filter-user.dto'
 import { plainToInstance } from 'class-transformer'
 import { ResponseUserDto } from './dto/response-user.dto'
@@ -19,6 +19,7 @@ import { AdminCreateUserDto } from './dto/admin-create-user.dto'
 import { ChangePasswordDto } from './dto/change-password.dto'
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto'
 import { dataPolicyAcceptance } from 'src/common/utils/data-policy.util'
+import { applyWordSearch } from 'src/common/utils/search.util'
 
 @Injectable()
 export class UsersService {
@@ -50,34 +51,39 @@ export class UsersService {
     return user
   }
 
-  async findAll(filters: FilterUserDto) {
-    const { page = 1, limit = 10, name, lastname, email } = filters
+  private applyFilters(
+    query: SelectQueryBuilder<User>,
+    { search, name, lastname, email }: FilterUserDto,
+  ) {
+    applyWordSearch(query, ['user.name', 'user.lastname', 'user.email'], search)
+    if (name) query.andWhere('user.name ILIKE :name', { name: `%${name}%` })
+    if (lastname)
+      query.andWhere('user.lastname ILIKE :lastname', {
+        lastname: `%${lastname}%`,
+      })
+    if (email)
+      query.andWhere('user.email ILIKE :email', { email: `%${email}%` })
+    return query
+      .orderBy('user.lastname', 'ASC')
+      .addOrderBy('user.name', 'ASC')
+      .addOrderBy('user.id_user', 'ASC')
+  }
 
-    const skip = (page - 1) * limit
+  async findAll(filters: FilterUserDto) {
+    const { page = 1, limit = 10 } = filters
 
     const query = this.usersRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.athletesInCategory', 'athletes_in_categories')
       .leftJoinAndSelect('user.role', 'role')
-      .skip(skip)
+    this.applyFilters(query, filters)
+    if (filters.role)
+      query.andWhere('role.code = :role', { role: filters.role })
+
+    const [users, total] = await query
+      .skip((page - 1) * limit)
       .take(limit)
-      .orderBy('user.id_user', 'ASC')
-
-    if (name) {
-      query.andWhere('user.name ILIKE :name', { name: `%${name}%` })
-    }
-
-    if (lastname) {
-      query.andWhere('user.lastname ILIKE :lastname', {
-        lastname: `%${lastname}%`,
-      })
-    }
-
-    if (email) {
-      query.andWhere('user.email ILIKE :email', { email: `%${email}%` })
-    }
-
-    const [users, total] = await query.getManyAndCount()
+      .getManyAndCount()
 
     if (total === 0)
       throw new NotFoundException({
@@ -101,33 +107,30 @@ export class UsersService {
   }
 
   async findAllAthletes(filters: FilterUserDto) {
-    const { page = 1, limit = 10, name, lastname, email } = filters
-
-    const skip = (page - 1) * limit
+    const { page = 1, limit = 10, id_season, id_category, unassigned } = filters
 
     const query = this.usersRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .where('user.id_role = :idRole', { idRole: ROLE_IDS.DEPORTISTA })
-      .skip(skip)
+    this.applyFilters(query, filters)
+
+    if (id_season && unassigned) {
+      query.andWhere(
+        'NOT EXISTS (SELECT 1 FROM athletes_in_categories aic WHERE aic.id_user = user.id_user AND aic.id_season = :id_season)',
+        { id_season },
+      )
+    } else if (id_season && id_category) {
+      query.andWhere(
+        'EXISTS (SELECT 1 FROM athletes_in_categories aic WHERE aic.id_user = user.id_user AND aic.id_season = :id_season AND aic.id_category = :id_category)',
+        { id_season, id_category },
+      )
+    }
+
+    const [users, total] = await query
+      .skip((page - 1) * limit)
       .take(limit)
-      .orderBy('user.id_user', 'ASC')
-
-    if (name) {
-      query.andWhere('user.name ILIKE :name', { name: `%${name}%` })
-    }
-
-    if (lastname) {
-      query.andWhere('user.lastname ILIKE :lastname', {
-        lastname: `%${lastname}%`,
-      })
-    }
-
-    if (email) {
-      query.andWhere('user.email ILIKE :email', { email: `%${email}%` })
-    }
-
-    const [users, total] = await query.getManyAndCount()
+      .getManyAndCount()
 
     if (total === 0)
       throw new NotFoundException({
