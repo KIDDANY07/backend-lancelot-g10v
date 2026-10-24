@@ -16,7 +16,7 @@ import { MlGovernanceRulesService } from './ml-governance-rules.service'
 import { MlReadinessService } from './ml-readiness.service'
 import { TalentReadinessService } from './talent-readiness.service'
 
-const TASK_LABELS: Record<MlModelTask, string> = {
+export const TASK_LABELS: Record<MlModelTask, string> = {
   [MlModelTask.INJURY_RISK]: 'riesgo de lesión',
   [MlModelTask.TALENT]: 'talento',
 }
@@ -64,6 +64,11 @@ export class MlModelsService {
         : 'Modelo registrado; un administrador debe activarlo si cumple las condiciones',
       model: this.toResponse(model),
     }
+  }
+
+  async findResponseByVersion(version: string) {
+    const model = await this.mlModelsRepository.findOne({ where: { version } })
+    return model ? this.toResponse(model) : null
   }
 
   async findAll(filters: FilterMlModelDto) {

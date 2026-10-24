@@ -17,6 +17,7 @@ import { MlInferenceService } from './ml-inference.service'
 import { MlModelsController } from './ml-models.controller'
 import { MlModelsService } from './ml-models.service'
 import { MlReadinessService } from './ml-readiness.service'
+import { MlTrainingService } from './ml-training.service'
 import { MlTalentPredictor } from './predictors/ml-talent.predictor'
 import { TalentInferenceService } from './talent-inference.service'
 import { TalentReadinessService } from './talent-readiness.service'
@@ -41,6 +42,7 @@ import { TalentReadinessService } from './talent-readiness.service'
     MlGovernanceRulesService,
     MlReadinessService,
     MlModelsService,
+    MlTrainingService,
     MlEngineConfigService,
     MlInferenceService,
     TalentReadinessService,

@@ -28,13 +28,29 @@ import {
   MlServiceApiKeyGuard,
   MlServiceOrJwtGuard,
 } from './guards/ml-service-api-key.guard'
+import { TrainMlModelDto } from './dto/train-ml-model.dto'
 import { MlModelsService } from './ml-models.service'
+import { MlTrainingService } from './ml-training.service'
 
 @ApiTags('ML - Registro de modelos')
 @ApiBearerAuth('bearerAuth')
 @Controller('ml/models')
 export class MlModelsController {
-  constructor(private readonly mlModelsService: MlModelsService) {}
+  constructor(
+    private readonly mlModelsService: MlModelsService,
+    private readonly mlTrainingService: MlTrainingService,
+  ) {}
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Post('train')
+  @ApiOperation({
+    summary:
+      'Entrenar ahora un modelo en el servicio de ML con los datos de la base. El servicio verifica la readiness de la tarea, entrena y registra el modelo sin activarlo',
+  })
+  train(@Body() trainMlModelDto: TrainMlModelDto) {
+    return this.mlTrainingService.train(trainMlModelDto.task)
+  }
 
   @UseGuards(MlServiceApiKeyGuard)
   @Post()
