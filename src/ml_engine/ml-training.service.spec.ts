@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { MlModelTask } from './entities/ml-model.entity'
 import { MlModelsService } from './ml-models.service'
+import { MlServiceClient } from './ml-service.client'
 import { MlTrainingService } from './ml-training.service'
 
 jest.mock('@nestjs/typeorm', () => ({
@@ -39,7 +40,10 @@ function buildService(env: Record<string, string | undefined> = ENV) {
     findResponseByVersion,
   } as unknown as MlModelsService
   return {
-    service: new MlTrainingService(configService, mlModelsService),
+    service: new MlTrainingService(
+      new MlServiceClient(configService),
+      mlModelsService,
+    ),
     findResponseByVersion,
   }
 }

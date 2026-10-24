@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -95,5 +96,29 @@ export class MlModelsController {
   @ApiParam({ name: 'id', type: Number })
   activate(@Param('id', ParseIntPipe) id_model: number) {
     return this.mlModelsService.activate(id_model)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Put('id/:id/deactivate')
+  @ApiOperation({
+    summary:
+      'Desactivar un modelo. Si el motor de su tarea estaba en shadow o ml, vuelve a rules en el mismo paso',
+  })
+  @ApiParam({ name: 'id', type: Number })
+  deactivate(@Param('id', ParseIntPipe) id_model: number) {
+    return this.mlModelsService.deactivate(id_model)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Delete('id/:id')
+  @ApiOperation({
+    summary:
+      'Eliminar un modelo inactivo junto con sus predicciones y pedir al servicio de ML que borre su archivo',
+  })
+  @ApiParam({ name: 'id', type: Number })
+  remove(@Param('id', ParseIntPipe) id_model: number) {
+    return this.mlModelsService.remove(id_model)
   }
 }

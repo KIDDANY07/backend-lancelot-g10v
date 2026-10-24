@@ -79,6 +79,7 @@ docker run --env-file ml-service/.env -p 8000:8000 -v lancelot-models:/app/model
 | POST | `/train` | `x-api-key` | Recibe `{ source: "db" \| "csv", csv_path, allow_insufficient_data }`. Entrena, guarda y registra el modelo. |
 | POST | `/talent/predict` | `x-api-key` | Igual que `/predict`, con las variables del dataset de talento y el modelo de talento activo. |
 | POST | `/talent/train` | `x-api-key` | Igual que `/train`, contra la readiness y el dataset de talento. |
+| DELETE | `/models/{version}` | `x-api-key` | Borra el archivo `.joblib` de esa versión. Lo llama el backend al eliminar un modelo. |
 
 `/predict` solo recibe variables numéricas del snapshot. El backend aplica una lista blanca, así que nunca llegan nombres, correos, fechas de nacimiento ni `id_user`, de acuerdo con la Ley 1581 de 2012.
 

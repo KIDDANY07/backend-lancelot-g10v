@@ -173,3 +173,25 @@ def test_train_reports_an_unreachable_database_as_502(client, monkeypatch):
 def test_train_requires_the_api_key(client):
     response = client.post("/train", json={"source": "db"})
     assert response.status_code == 401
+
+
+def test_delete_model_removes_its_file(client, tmp_path):
+    (tmp_path / "rf-2026-10-23.joblib").write_bytes(b"modelo")
+
+    response = client.delete("/models/rf-2026-10-23", headers=HEADERS)
+
+    assert response.status_code == 200
+    assert response.json()["deleted"] is True
+    assert not (tmp_path / "rf-2026-10-23.joblib").exists()
+
+
+def test_delete_model_without_file_is_not_an_error(client):
+    response = client.delete("/models/talento-lr-1", headers=HEADERS)
+
+    assert response.status_code == 200
+    assert response.json()["deleted"] is False
+
+
+def test_delete_model_rejects_unsafe_versions_and_requires_the_api_key(client):
+    assert client.delete("/models/..joblib", headers=HEADERS).status_code in (400, 422)
+    assert client.delete("/models/rf-1").status_code == 401

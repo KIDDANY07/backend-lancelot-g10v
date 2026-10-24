@@ -6,9 +6,9 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { MlModelTask } from './entities/ml-model.entity'
 import { MlModelsService, TASK_LABELS } from './ml-models.service'
+import { MlServiceClient } from './ml-service.client'
 
 export const ML_TRAINING_TIMEOUT_MS = 170_000
 
@@ -37,7 +37,7 @@ export class MlTrainingService {
   private readonly logger = new Logger(MlTrainingService.name)
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly mlServiceClient: MlServiceClient,
     private readonly mlModelsService: MlModelsService,
   ) {}
 
@@ -49,46 +49,24 @@ export class MlTrainingService {
   }
 
   private async callService(task: MlModelTask) {
-    const baseUrl = this.configService.get<string>('ML_SERVICE_URL')
-    if (!baseUrl)
+    if (!this.mlServiceClient.baseUrl)
       throw new ServiceUnavailableException({
         status: 'Error',
         mensaje:
           'ML_SERVICE_URL no está configurada: el backend no puede contactar el servicio de ML',
       })
-
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), ML_TRAINING_TIMEOUT_MS)
     try {
-      const response = await fetch(
-        `${baseUrl.replace(/\/$/, '')}${TRAIN_PATHS[task]}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key':
-              this.configService.get<string>('ML_SERVICE_API_KEY') ?? '',
-          },
-          body: JSON.stringify({ source: 'db' }),
-          signal: controller.signal,
-        },
-      )
-      const body: unknown = await response.json().catch(() => null)
-      return { status: response.status, ok: response.ok, body }
+      return await this.mlServiceClient.request('POST', TRAIN_PATHS[task], {
+        body: { source: 'db' },
+        timeoutMs: ML_TRAINING_TIMEOUT_MS,
+      })
     } catch (error) {
-      const reason =
-        error instanceof Error && error.name === 'AbortError'
-          ? `no respondió en ${ML_TRAINING_TIMEOUT_MS / 1000} s`
-          : error instanceof Error
-            ? error.message
-            : String(error)
+      const reason = error instanceof Error ? error.message : String(error)
       this.logger.error(`Error al entrenar en el servicio de ML: ${reason}`)
       throw new ServiceUnavailableException({
         status: 'Error',
         mensaje: `No se pudo contactar el servicio de ML: ${reason}`,
       })
-    } finally {
-      clearTimeout(timer)
     }
   }
 

@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Path
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -204,3 +204,18 @@ def train_talent(request: TrainRequest) -> dict:
         "un modelo de talento real.",
     )
 
+
+@app.delete("/models/{version}", dependencies=[Depends(require_api_key)])
+def delete_model(version: str = Path(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")) -> dict:
+    if ".." in version:
+        raise HTTPException(status_code=400, detail="Versión de modelo inválida")
+    path = get_settings().models_dir / f"{version}.joblib"
+    existed = path.is_file()
+    if existed:
+        path.unlink()
+    return {
+        "mensaje": f"Archivo del modelo {version} eliminado"
+        if existed
+        else f"El modelo {version} no tenía archivo en este servicio",
+        "deleted": existed,
+    }

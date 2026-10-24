@@ -56,7 +56,7 @@ export class InjuryRiskPrediction {
   @JoinColumn({ name: 'id_user' })
   athlete: User
 
-  @ManyToOne(() => MlModel)
+  @ManyToOne(() => MlModel, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_model' })
   model: MlModel
 }
