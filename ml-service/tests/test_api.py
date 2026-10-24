@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 from app import backend_client, main
 from app.predict import ModelStore
@@ -150,6 +151,23 @@ def test_train_with_insufficient_data_allowed_registers_a_synthetic_model(
     assert len(registered) == 1
     assert registered[0]["is_synthetic"] is True
     assert "sintético" in response.json()["mensaje"]
+
+
+def test_train_reports_an_unreachable_database_as_502(client, monkeypatch):
+    def unreachable(_url):
+        raise OperationalError(
+            "SELECT", {}, Exception("failed to resolve host 'postgres.railway.internal'")
+        )
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@postgres.railway.internal/db")
+    monkeypatch.setattr(backend_client, "get_readiness", lambda: {"ready": True, "criteria": []})
+    monkeypatch.setattr(main, "load_dataset_from_db", unreachable)
+
+    response = client.post("/train", json={"source": "db"}, headers=HEADERS)
+
+    assert response.status_code == 502
+    assert "DATABASE_URL" in response.json()["detail"]
+    assert "postgres.railway.internal" in response.json()["detail"]
 
 
 def test_train_requires_the_api_key(client):

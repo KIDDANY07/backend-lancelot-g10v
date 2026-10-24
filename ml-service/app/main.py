@@ -8,6 +8,7 @@ import pandas as pd
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import backend_client
 from app.backend_client import BackendError
@@ -148,7 +149,15 @@ def _run_training(
     else:
         if not settings.database_url:
             raise HTTPException(status_code=400, detail="DATABASE_URL no está configurada")
-        dataset = load_from_db(settings.database_url)
+        try:
+            dataset = load_from_db(settings.database_url)
+        except SQLAlchemyError as error:
+            logger.error("No se pudo leer la base de datos: %s", error)
+            reason = str(getattr(error, "orig", None) or error).splitlines()[0]
+            raise HTTPException(
+                status_code=502,
+                detail=f"El servicio de ML no pudo leer la base de datos (revise DATABASE_URL): {reason}",
+            ) from error
 
     is_synthetic = (not ready) or request.source == "csv"
     try:
