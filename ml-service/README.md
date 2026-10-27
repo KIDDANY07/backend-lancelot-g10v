@@ -1,148 +1,178 @@
-# Lancelot ML: microservicio de la fase 2
+# Servicio de aprendizaje automático de LANCELOT G11V
 
-Microservicio en Python (FastAPI y scikit-learn) que entrena y sirve dos modelos de aprendizaje automático del módulo de apoyo a la decisión del backend Lancelot:
+Este servicio es una API (un programa que recibe solicitudes de otros programas). Recibe datos deportivos del servidor y devuelve resultados de análisis. Docker es una herramienta para ejecutar aplicaciones dentro de contenedores. Esta guía describe el flujo del código; no afirma que haya archivos de resultados disponibles en producción.
 
-- el de **riesgo de lesión sin contacto** (fase 2 del riesgo);
-- el de **potencial de ascenso** (fase 2 de la detección de talento), que aprende de los ascensos reales del club.
+## Inicio rápido
 
-Cada modelo está **condicionado a su propia readiness**: el de riesgo, a una temporada completa de datos diarios etiquetados (Rossi et al., 2018; Van Eetvelde et al., 2021); el de talento, a dos temporadas con ascensos reales etiquetados. Mientras no se cumpla, el backend sigue funcionando solo con las reglas.
+Sigue estos pasos después de instalar Python, configurar `backend/ml-service/.env` y encender PostgreSQL y el servidor.
 
-> ⚠️ **Datos sintéticos.** Las métricas que se obtienen con datos sintéticos (`scripts/generate_synthetic.py`) **no representan el desempeño real del modelo y no deben reportarse como resultados** del trabajo de grado. Esos datos solo sirven para comprobar que el pipeline funciona de extremo a extremo. Los modelos entrenados con datos sintéticos o insuficientes quedan registrados con `is_synthetic = true`, y el backend **nunca** permite activarlos.
+1. En PowerShell, dentro de `backend/ml-service/`, inicia Uvicorn (el programa que ejecuta el servicio) con **.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000 --env-file .env**. En Mac/Linux usa **.venv/bin/python -m uvicorn app.main:app --reload --port 8000 --env-file .env**. Verás que Uvicorn queda en ejecución.
+2. Abre la ruta `/health` en el puerto local 8000. La respuesta debe mostrar `status: ok`. La ruta informa el estado del servicio.
+3. Abre la ruta `/docs` en el puerto local 8000. Verás la lista de acciones del servicio.
 
-## Cómo encaja con el backend
+## Antes de empezar
 
-1. El backend genera cada día, a las 5 AM, un snapshot de variables por deportista en la tabla `athlete_daily_features` y etiqueta retroactivamente cada día con `label_injury_7d`: si hubo una lesión sin contacto en los 7 días siguientes.
-2. Cuando hay datos suficientes (`GET /api/ml/readiness`), se llama a `POST /train` en este servicio. El servicio entrena, compara con las reglas de la fase 1 y registra el modelo en el backend (`POST /api/ml/models`).
-3. Un administrador activa el modelo en el backend (`PUT /api/ml/models/id/:id/activate`). La activación exige:
-   - que el modelo no sea sintético;
-   - que se cumpla la readiness;
-   - que el modelo supere a las reglas en PR-AUC.
-4. Con el motor en modo `shadow` o `ml`, el backend llama a `POST /predict` cada día. Si este servicio falla, el backend sigue con las reglas.
+Necesitas la carpeta `backend/ml-service/`. La dirección para descargar el espacio de trabajo completo está **por confirmar**. PostgreSQL es el programa que guarda los datos. Docker ejecuta programas aislados en contenedores.
 
-### Modelo de talento
+| Programa | Versión mínima o recomendada | Descarga oficial |
+|---|---|---|
+| Python, ejecuta el servicio y sus cálculos | Python 3.12 o posterior; el Dockerfile usa 3.12. | [Descargar Python](https://www.python.org/downloads/) |
+| Node.js, necesario si también ejecutarás el servidor o la página web | Vite 8 requiere Node 20.19+ o 22.12+; se recomienda Node 24 LTS. | [Descargar Node.js](https://nodejs.org/en/download) · [requisitos de Vite](https://vite.dev/guide/) |
+| Docker Desktop, opción para ejecutar PostgreSQL o aprendizaje automático en un contenedor | El proyecto no fija versión; instala la versión estable actual. | [Windows](https://docs.docker.com/desktop/setup/install/windows-install/) · [Mac](https://docs.docker.com/desktop/setup/install/mac-install/) · [Linux](https://docs.docker.com/desktop/setup/install/linux/) |
+| Git, descarga y organiza el código fuente | El proyecto no fija versión mínima; instala la versión estable actual. | [Descargar Git](https://git-scm.com/downloads/) |
 
-1. El backend reconstruye cada noche, y cada vez que detecta talento, la tabla `athlete_season_features`: una fila por deportista y temporada con su índice de progreso, su percentil, sus dimensiones y su contexto de edad.
-2. La etiqueta `label_promoted` es el **ascenso real**: que la temporada siguiente el deportista juegue en una categoría superior a la que le corresponde por edad. Se etiqueta cuando la temporada siguiente ya tiene plantilla; quien no sigue en el club queda excluido.
-3. Cuando se cumple `GET /api/ml/talent-readiness`, se llama a `POST /talent/train`. Entrena con las temporadas anteriores, prueba con la última etiquetada, compara con las reglas de talento y registra el modelo con `task = talent`.
-4. Activado el modelo y con el motor de talento en `shadow` o `ml`, el backend llama a `POST /talent/predict` al detectar talento de una temporada.
+Comprueba las instalaciones en PowerShell (Windows) o Terminal (Mac/Linux):
 
-## Configuración
+1. Windows: **py -3.12 --version**; Mac/Linux: **python3 --version**. Debe indicar Python 3.12 o posterior.
+2. **node -v** — debe ser compatible con Vite 8 si también levantarás la aplicación web o el servidor.
+3. **docker --version** — solo si usarás contenedores.
+4. **git --version** — debe mostrar la versión de Git.
 
-Copie `.env.example` a `.env` y complete los valores:
+## Para usar el proyecto
 
-| Variable | Descripción |
+### Instalación paso a paso
+
+1. Abre PowerShell o Terminal en la raíz del espacio de trabajo y entra a esta carpeta con `cd backend/ml-service`. Debes quedar dentro de `backend/ml-service/`.
+2. Crea un entorno aislado de Python. En Windows ejecuta **py -3.12 -m venv .venv**; en Mac/Linux ejecuta **python3 -m venv .venv**. Al terminar aparecerá la carpeta `.venv`.
+3. Instala las librerías desde `backend/ml-service/`. En Windows usa **.\.venv\Scripts\python.exe -m pip install -r requirements.txt**; en Mac/Linux usa **.venv/bin/python -m pip install -r requirements.txt**. Espera a que pip termine sin errores.
+4. Si no existe `.env`, copia la plantilla. En PowerShell: `Copy-Item .env.example .env`. En Mac/Linux: `cp .env.example .env`. No reemplaces un archivo existente.
+5. Abre `.env` en un editor de texto y completa la tabla siguiente. Usa datos ficticios en tu computador. La clave compartida debe coincidir con `ML_SERVICE_API_KEY` en `backend/.env`.
+6. Deja PostgreSQL y el servidor encendidos si vas a procesar solicitudes que consultan datos. Inicia el servicio con los comandos de Inicio rápido.
+
+### Configuración: archivo .env
+
+Una **variable de entorno** es un dato de configuración guardado fuera del código. No compartas los valores de .env. Los ejemplos son inventados y solo sirven para desarrollo local.
+
+| Variable | Para qué sirve | Qué configurar en local |
+|---|---|---|
+| `DATABASE_URL` | Conexión de lectura a PostgreSQL para preparar los datos. | Configura el host, el usuario, el puerto local y la base `lancelot`. |
+| `BACKEND_URL` | Dirección base del servidor; el servicio agrega el prefijo `/api` a sus rutas. | Dirección local del servidor en el puerto 3000. |
+| `ML_SERVICE_API_KEY` | Clave compartida para autenticar solicitudes entre el servicio y el servidor. | Usa una clave local ficticia y la misma en ambos archivos `.env`. |
+| `MODELS_DIR` | Carpeta donde el proceso guarda los archivos que genera. | `./models` |
+| `BACKEND_TIMEOUT_SECONDS` | Tiempo máximo que espera una respuesta del servidor. | `10` segundos. |
+| `PORT` | Puerto HTTP del servicio; el Dockerfile usa 8000 si falta. | `8000` |
+
+La tabla explica cada variable; conserva el formato de `.env.example`. El servicio consulta PostgreSQL en modo de solo lectura durante el entrenamiento. No incluyas contraseñas reales en documentos ni ejemplos.
+
+### Cómo ejecutarlo y comprobar que funciona
+
+Deja abierta la terminal donde corre Uvicorn. Consulta la ruta `/health` en el puerto 8000; la respuesta debe mostrar `status: ok`. La documentación interactiva está en `/docs` del mismo puerto.
+
+El código prepara variables, recibe solicitudes de entrenamiento y envía el resultado al servidor. Las rutas de estimación usan la versión indicada por el servidor si los archivos necesarios están disponibles. Esta descripción explica el funcionamiento del código; no confirma archivos generados en producción. El servidor conserva sus reglas como alternativa para calcular el riesgo.
+
+### Comandos disponibles
+
+Ejecuta los comandos desde `backend/ml-service/`. Para Python, usa el ejecutable del entorno: Windows **.\.venv\Scripts\python.exe**; Mac/Linux **.venv/bin/python**.
+
+| Comando | Para qué sirve | Cuándo usarlo |
+|---|---|---|
+| Windows: py -3.12 -m venv .venv; Mac/Linux: python3 -m venv .venv | Crea el entorno aislado. | Primera instalación. |
+| Windows: .\.venv\Scripts\python.exe -m pip install -r requirements.txt; Mac/Linux: .venv/bin/python -m pip install -r requirements.txt | Instala las librerías. | Primera instalación o tras cambiar dependencias. |
+| Windows: .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000 --env-file .env; Mac/Linux: .venv/bin/python -m uvicorn app.main:app --reload --port 8000 --env-file .env | Inicia el servicio y lee .env. | Uso local. |
+| Windows: .\.venv\Scripts\python.exe -m pytest; Mac/Linux: .venv/bin/python -m pytest | Ejecuta las pruebas Python. | Revisar cambios. |
+| `python scripts/generate_synthetic.py --output data/synthetic_features.csv` | Crea datos ficticios de riesgo en un archivo CSV (datos organizados en filas y columnas). | Ensayar el flujo de entrenamiento. |
+| `docker build -t lancelot-ml .` | Construye la imagen Docker. | Ejecución opcional con contenedor. |
+| `docker run --name lancelot-ml --env-file .env -p 8000:8000 --volume lancelot-models:/app/models lancelot-ml` | Inicia el contenedor y conserva los archivos que genere el entrenamiento. | Si prefieres Docker al entorno local. |
+
+El proyecto incluye un `Dockerfile`, pero no un archivo `docker-compose`. Si ejecutas el servicio dentro de Docker Desktop y el servidor y PostgreSQL corren fuera del contenedor, cambia `localhost` por `host.docker.internal` en `BACKEND_URL` y en el host de `DATABASE_URL`. Usa la dirección local de la tabla cuando ejecutes el servicio directamente con Python.
+
+## Problemas comunes
+
+1. **No se encuentra Python 3.12.** La terminal dice que python o py no existe. Instala Python desde el enlace oficial y abre una terminal nueva.
+2. **La instalación de librerías falla.** Comprueba que Python sea 3.12 o posterior, que haya Internet y que estés en `backend/ml-service/`.
+3. **Uvicorn no encuentra app.main.** Aparece el mensaje Could not import module. Entra a backend/ml-service/ y vuelve a iniciar desde allí.
+4. **La respuesta dice 401.** La clave no coincide. Compara ML_SERVICE_API_KEY en los dos .env y reinicia ambos servicios.
+5. **La ruta de predicción devuelve 503.** El servidor pidió una versión cuyos archivos no están disponibles. Revisa `MODELS_DIR` y el registro que mantiene el servidor. El aviso de datos indica que aún no se cumplen los criterios para iniciar el entrenamiento.
+6. **El entrenamiento no conecta con la base.** Comprueba que PostgreSQL esté encendido y que DATABASE_URL apunte a la base correcta. El servidor debe haber creado las tablas de variables.
+
+## Para desarrolladores
+
+**Estimación automática:** cálculo que usa datos registrados para aproximar un resultado futuro. El servicio describe el proceso que ejecuta el código cuando recibe una solicitud; no confirma que haya archivos de entrenamiento disponibles en cada entorno.
+
+### Estructura y versiones
+
+FastAPI organiza la API y Uvicorn la ejecuta. `requirements.txt` declara librerías con versiones mínimas, no exactas: FastAPI >=0.115, Uvicorn >=0.30, pandas >=2.2, NumPy >=2.0, scikit-learn >=1.5, SQLAlchemy >=2.0, psycopg >=3.2, joblib >=1.4 y SHAP >=0.46. pytest y httpx se usan en pruebas. No hay package.json ni pyproject.toml.
+
+- app/main.py: rutas HTTP, clave y coordinación de entrenamiento y predicción.
+- app/features.py y app/talent_features.py: variables permitidas y preparación de conjuntos.
+- `app/train.py`: ejecuta y evalúa el proceso de entrenamiento cuando el servidor lo solicita.
+- `app/predict.py` y `app/explain.py`: procesan solicitudes de estimación y preparan los factores que explican el resultado.
+- `app/db.py`: lectura de PostgreSQL; `app/backend_client.py`: consulta criterios de datos y comunica resultados con el servidor.
+- `app/config.py`: configuración; `scripts/generate_synthetic.py`: datos ficticios; `tests/`: pruebas.
+
+### Arquitectura de carpetas y archivos
+
+| Ruta | Función |
 |---|---|
-| `DATABASE_URL` | Conexión de **solo lectura** a PostgreSQL. Solo se consultan las tablas `athlete_daily_features` y `athlete_season_features`. Se recomienda un usuario con permiso `SELECT` únicamente sobre ellas. |
-| `BACKEND_URL` | URL base del backend Nest, sin `/api`. |
-| `ML_SERVICE_API_KEY` | La misma clave que `ML_SERVICE_API_KEY` en el backend. Se usa en la cabecera `x-api-key` en ambos sentidos. |
-| `MODELS_DIR` | Carpeta donde se guardan los modelos entrenados (`.joblib`). |
-| `BACKEND_TIMEOUT_SECONDS` | Tiempo máximo de espera de las llamadas al backend (por defecto 10). |
+| requirements.txt | Declara las librerías de Python y sus versiones mínimas. |
+| Dockerfile | Construye la imagen desde Python 3.12, instala dependencias, copia app/ y scripts/, y arranca Uvicorn. |
+| .dockerignore | Excluye archivos locales que no deben entrar en la imagen. |
+| .env.example | Enumera variables necesarias, sin valores privados. |
+| app/main.py | Define rutas, valida x-api-key y coordina el flujo. |
+| app/config.py | Lee configuración del proceso. |
+| app/features.py y app/talent_features.py | Definen variables y preparan los datos de cada tarea. |
+| app/db.py y app/backend_client.py | Lee conjuntos de PostgreSQL y consulta o actualiza información de integración en el backend. |
+| app/train.py | Entrena y evalúa cuando se solicita el proceso. |
+| app/predict.py y app/explain.py | Carga los artefactos requeridos por una solicitud y prepara resultados y factores. |
+| app/synthetic.py y scripts/generate_synthetic.py | Generan conjuntos sintéticos de prueba. |
+| tests/ | Pruebas de rutas, datos, entrenamiento y resultados. |
 
-Ejemplo de usuario de solo lectura:
+### Qué predice y qué datos usa
 
-```sql
-CREATE ROLE lancelot_ml_readonly LOGIN PASSWORD '...';
-GRANT CONNECT ON DATABASE lancelot TO lancelot_ml_readonly;
-GRANT USAGE ON SCHEMA public TO lancelot_ml_readonly;
-GRANT SELECT ON athlete_daily_features, athlete_season_features TO lancelot_ml_readonly;
+- El código calcula una estimación de riesgo de lesión sin contacto para los siguientes siete días. Usa variables diarias como edad, cargas de entrenamiento, RPE (esfuerzo percibido por el deportista), sesiones, minutos de partido e historial de lesiones.
+- El código también estima el potencial de ascenso deportivo con datos por temporada: índice de progreso, percentil, puntajes, edad, experiencia en el club y lesiones. Para comparar resultados se requiere un ascenso registrado para la temporada siguiente.
+- Durante el entrenamiento, el código separa los datos por fecha o temporada para evitar usar información futura. Compara el resultado con las reglas existentes mediante PR-AUC (medida de precisión y cobertura útil cuando hay pocos casos positivos).
+- La lectura usa `athlete_daily_features` y `athlete_season_features` de PostgreSQL, en modo de solo lectura. El servidor limita las variables que comparte y no envía nombres ni correos.
+
+Una **etiqueta** es un resultado real registrado que el proceso usa para comparar sus estimaciones. No se revisó el contenido de los datos ni de los archivos generados en un entorno.
+
+### Rutas del servicio
+
+Un **endpoint** es una ruta que recibe solicitudes de otro programa. Todas las rutas, excepto `/health`, requieren la cabecera `x-api-key`.
+
+| Método y ruta | Función |
+|---|---|
+| `GET /health` | Estado del servicio e indicadores de carga que expone el código. |
+| `POST /predict` | Estima riesgo de lesión sin contacto. |
+| `POST /talent/predict` | Estima potencial de ascenso. |
+| `POST /train` | Ejecuta el proceso de entrenamiento de riesgo con datos de la base o un CSV. |
+| `POST /talent/train` | Ejecuta el proceso de entrenamiento de talento con datos de la base o un CSV. |
+| `DELETE /models/{version}` | Elimina los archivos locales asociados con esa versión cuando el servidor borra su registro. |
+
+FastAPI muestra la documentación de rutas en `/docs`. El servidor indica qué versión debe procesar una solicitud y recibe el resultado.
+
+### Entrenamiento y límites actuales
+
+El servidor prepara conjuntos diarios para riesgo y conjuntos por temporada para talento. El servicio consulta PostgreSQL, separa los datos por fecha o temporada, procesa el entrenamiento y comunica el resultado al servidor. Este flujo depende de que existan datos suficientes y de que las métricas superen la referencia de las reglas.
+
+CSV es un archivo de datos organizado en filas y columnas. El código marca como sintético el resultado del proceso cuando usa un CSV y el servidor impide activarlo. Esos resultados no representan el rendimiento con deportistas reales. La cantidad y la calidad de los datos afectan las estimaciones. El código no establece un diagnóstico médico ni reemplaza al equipo de salud. Esta guía describe capacidades del código; no afirma que haya archivos generados o activos.
+
+Hay seis archivos de pruebas bajo tests/; no se ejecutaron durante esta documentación.
+
+### Construir y ejecutar con Docker
+
+Docker empaqueta el servicio y sus dependencias para ejecutarlo como contenedor. Ejecuta estos comandos en PowerShell o Terminal, desde `backend/ml-service/`.
+
+1. Construye la imagen con **`docker build -t lancelot-ml .`**. Docker mostrará los pasos de construcción y terminará sin errores.
+2. Inicia el contenedor con **`docker run --name lancelot-ml --env-file .env -p 8000:8000 --volume lancelot-models:/app/models lancelot-ml`**. La terminal devolverá el identificador del contenedor.
+3. Comprueba la ruta `/health` en el puerto `8000`; la respuesta debe mostrar `status: ok`.
+
+El volumen `lancelot-models` conserva los archivos que el proceso genere durante el entrenamiento. Si el servidor y PostgreSQL corren fuera de Docker Desktop, configura BACKEND_URL y el host de DATABASE_URL para que el contenedor los alcance mediante host.docker.internal.
+
+## Cómo se conecta con los otros proyectos
+
+El servidor prepara los datos y consulta este servicio. El servicio de aprendizaje automático también lee PostgreSQL directamente durante el entrenamiento. La aplicación web solo se comunica con el servidor.
+
+```mermaid
+flowchart LR
+  client["Aplicación web"]
+  backend["Servidor NestJS"]
+  ml["Servicio de aprendizaje automático (FastAPI)"]
+  db["Base PostgreSQL"]
+  client --> backend
+  backend <--> ml
+  backend --> db
+  ml --> db
 ```
 
-## Ejecución local
-
-En Windows:
-
-```bash
-cd ml-service
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --port 8000 --env-file .env
-```
-
-En Linux o macOS, active el entorno con `source .venv/bin/activate`.
-
-En el `.env` del backend configure `ML_SERVICE_URL=http://localhost:8000`.
-
-## Docker
-
-```bash
-docker build -t lancelot-ml ./ml-service
-docker run --env-file ml-service/.env -p 8000:8000 -v lancelot-models:/app/models lancelot-ml
-```
-
-## Endpoints
-
-| Método | Ruta | Protección | Descripción |
-|---|---|---|---|
-| GET | `/health` | Ninguna | Estado del servicio y de los modelos cargados (riesgo y talento). |
-| POST | `/predict` | `x-api-key` | Recibe `{ model_version, features }` y devuelve `{ probability, top_factors: [{ feature, contribution }], model_version }`. |
-| POST | `/train` | `x-api-key` | Recibe `{ source: "db" \| "csv", csv_path, allow_insufficient_data }`. Entrena, guarda y registra el modelo. |
-| POST | `/talent/predict` | `x-api-key` | Igual que `/predict`, con las variables del dataset de talento y el modelo de talento activo. |
-| POST | `/talent/train` | `x-api-key` | Igual que `/train`, contra la readiness y el dataset de talento. |
-| DELETE | `/models/{version}` | `x-api-key` | Borra el archivo `.joblib` de esa versión. Lo llama el backend al eliminar un modelo. |
-
-`/predict` solo recibe variables numéricas del snapshot. El backend aplica una lista blanca, así que nunca llegan nombres, correos, fechas de nacimiento ni `id_user`, de acuerdo con la Ley 1581 de 2012.
-
-### Reglas de `/train`
-
-- **Readiness:** antes de entrenar se consulta `GET /api/ml/readiness`.
-  - Si no se cumple y `allow_insufficient_data` es `false`, responde **409** con los criterios pendientes.
-  - Si no se cumple y `allow_insufficient_data` es `true`, entrena igual, pero registra el modelo como sintético.
-- **Fuente CSV:** un entrenamiento con `source: "csv"` siempre se registra como sintético. El CSV no se puede verificar como dato real del club, así que los modelos activables se entrenan desde la base de datos.
-- **Filas usadas:** solo las que tienen `label_quality = 'labeled'`, `is_available = true` y la misma `feature_version` (`v1`).
-
-## Metodología de entrenamiento
-
-- **Partición temporal, no aleatoria.** El último 20 % de las fechas forma el conjunto de prueba. Así no hay fuga de información del futuro hacia el entrenamiento (hay un test que lo verifica).
-- **Modelos candidatos:**
-  - Línea base interpretable: `LogisticRegression(class_weight="balanced")` con imputación por mediana y `StandardScaler`.
-  - Candidato no lineal: `RandomForestClassifier(class_weight="balanced")` con imputación por mediana.
-- **Selección por PR-AUC** en el conjunto de prueba. Las lesiones son eventos raros, así que **no se usa accuracy**.
-- **Métricas reportadas:** ROC-AUC, PR-AUC, recall, precision y Brier, más `n_train`, `n_test` y `positives_test`. Recall y precision usan el umbral 0.5 sobre la probabilidad.
-- **Línea base de reglas:** se calculan las mismas métricas sobre el mismo conjunto de prueba usando `rules_risk_level` (alto = 1, medio = 0.5, sin alerta = 0). Medio o alto cuenta como positivo. El Brier de las reglas usa esa misma escala y es solo orientativo.
-- **Explicabilidad:** cada predicción devuelve los 3 factores con mayor contribución absoluta.
-  - En la regresión logística, la contribución es el coeficiente por el valor estandarizado.
-  - En el bosque aleatorio, se usan los valores SHAP (`shap.TreeExplainer`).
-- **Versionado:** cada modelo se guarda como `MODELS_DIR/<version>.joblib`. La versión indica el algoritmo, la fecha y, si aplica, el sufijo `-synthetic`.
-
-### Variables (`feature_version = v1`)
-
-`age_years`, `acute_load_7d`, `chronic_load_28d`, `acwr`, `acwr_ewma`, `monotony_7d`, `strain_7d`, `sessions_7d`, `rpe_avg_7d`, `match_minutes_7d`, `high_rpe_sessions_14d`, `prior_injuries_count`, `prior_non_contact_injuries_count`, `days_since_last_injury`, `is_recovering`.
-
-`rules_risk_level` no se usa como variable: se reserva para la comparación con la fase 1.
-
-### Modelo de talento (`feature_version = t1`)
-
-- **Partición por temporada:** la última temporada etiquetada es el conjunto de prueba y las anteriores, el de entrenamiento. Por eso se necesitan al menos dos.
-- **Mismos candidatos, selección y métricas** que el modelo de riesgo.
-- **Línea base de reglas:** `rules_flagged`, es decir, si las reglas de talento señalaron al deportista esa temporada.
-- **Variables:** `age_years`, `birth_quarter`, `years_to_category_max`, `plays_up`, `seasons_in_club`, `cohort_size`, `index_value`, `index_percentile`, `physical_score`, `technical_score`, `tactical_score` (solo si su perfil pondera la táctica), `participation_score`, `contribution_score`, `index_delta`, `injuries_in_season` y `severe_injury`.
-- **Versión:** empieza por `talento-`.
-
-## Probar el pipeline con datos sintéticos
-
-```bash
-python scripts/generate_synthetic.py --output data/synthetic_features.csv
-curl -X POST http://localhost:8000/train \
-  -H "x-api-key: <clave>" -H "Content-Type: application/json" \
-  -d '{"source": "csv", "csv_path": "data/synthetic_features.csv", "allow_insufficient_data": true}'
-```
-
-Para el modelo de talento, `python scripts/generate_synthetic.py --task talent --seasons 4` genera un CSV de cuatro temporadas y se entrena con `POST /talent/train`.
-
-El script nunca escribe en la base de datos. El modelo resultante queda registrado como sintético y **no puede activarse**. Recuerde que **sus métricas no son resultados reportables**.
-
-## Tests
-
-```bash
-pytest
-```
-
-Cubren:
-- el orden y los nombres de las variables, contrastados con la lista blanca y la exportación del backend;
-- la partición temporal sin fuga;
-- la selección por PR-AUC y la línea base de reglas;
-- la explicabilidad de ambos modelos;
-- la forma de la salida de `/predict`;
-- el rechazo de `/train` sin datos suficientes;
-- en talento: la lista blanca de variables, la partición por temporada, la línea base de reglas, el registro con `task = talent` y los endpoints `/talent/*`.
+El `Dockerfile` también configura internamente `PYTHONDONTWRITEBYTECODE` y `PYTHONUNBUFFERED`; no hace falta agregarlas a `.env`. El equipo indica que el servidor se despliega en Railway. El repositorio no confirma que este servicio se despliegue allí ni cómo conserva los archivos que genera.
