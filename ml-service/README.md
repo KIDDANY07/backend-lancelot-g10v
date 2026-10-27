@@ -147,7 +147,6 @@ El servidor prepara conjuntos diarios para riesgo y conjuntos por temporada para
 
 CSV es un archivo de datos organizado en filas y columnas. El código marca como sintético el resultado del proceso cuando usa un CSV y el servidor impide activarlo. Esos resultados no representan el rendimiento con deportistas reales. La cantidad y la calidad de los datos afectan las estimaciones. El código no establece un diagnóstico médico ni reemplaza al equipo de salud. Esta guía describe capacidades del código; no afirma que haya archivos generados o activos.
 
-Hay seis archivos de pruebas bajo tests/; no se ejecutaron durante esta documentación.
 
 ### Construir y ejecutar con Docker
 
