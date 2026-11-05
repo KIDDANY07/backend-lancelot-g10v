@@ -21,7 +21,7 @@ export class UpdateMlEngineConfigDto {
   @ApiPropertyOptional({
     example: 270,
     description:
-      'Mínimo de días distintos con snapshots etiquetados (aprox. una temporada completa)',
+      'Mínimo de días distintos (fechas del calendario, no deportista-día) con snapshots etiquetados. Por defecto 270: aprox. una temporada completa de entrenamientos y partidos',
   })
   min_labeled_days?: number
 
@@ -30,9 +30,9 @@ export class UpdateMlEngineConfigDto {
   @IsInt()
   @Min(1)
   @ApiPropertyOptional({
-    example: 30,
+    example: 20,
     description:
-      'Mínimo de lesiones sin contacto cubiertas por el periodo etiquetado',
+      'Mínimo de lesiones sin contacto cubiertas por el periodo etiquetado. Por defecto 20: con una plantilla de unos 15 deportistas, un club acumula entre 20 y 30 lesiones sin contacto en dos años, y 20 eventos positivos son el mínimo para estimar el modelo y evaluarlo en una partición temporal',
   })
   min_non_contact_injuries?: number
 
@@ -41,8 +41,9 @@ export class UpdateMlEngineConfigDto {
   @IsInt()
   @Min(1)
   @ApiPropertyOptional({
-    example: 20,
-    description: 'Mínimo de deportistas con snapshots etiquetados',
+    example: 15,
+    description:
+      'Mínimo de deportistas con snapshots etiquetados. Por defecto 15: el tamaño de la plantilla del club; exigir más impediría entrenar el modelo con todos sus deportistas',
   })
   min_athletes?: number
 
@@ -97,7 +98,8 @@ export class UpdateMlEngineConfigDto {
   @Min(1)
   @ApiPropertyOptional({
     example: 10,
-    description: 'Mínimo de ascensos reales en las temporadas etiquetadas',
+    description:
+      'Mínimo de ascensos o consolidaciones reales en las temporadas etiquetadas',
   })
   talent_min_promotions?: number
 
@@ -106,8 +108,9 @@ export class UpdateMlEngineConfigDto {
   @IsInt()
   @Min(1)
   @ApiPropertyOptional({
-    example: 30,
-    description: 'Mínimo de deportistas con temporadas etiquetadas',
+    example: 15,
+    description:
+      'Mínimo de deportistas con temporadas etiquetadas. Por defecto 15: el tamaño de la plantilla del club',
   })
   talent_min_athletes?: number
 

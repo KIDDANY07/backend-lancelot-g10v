@@ -6,22 +6,15 @@ from app.features import _to_bool
 TALENT_FEATURE_VERSION = "t1"
 
 TALENT_FEATURES: list[str] = [
-    "age_years",
-    "birth_quarter",
-    "years_to_category_max",
-    "plays_up",
-    "seasons_in_club",
-    "cohort_size",
-    "index_value",
-    "index_percentile",
     "physical_score",
     "technical_score",
     "tactical_score",
     "participation_score",
     "contribution_score",
     "index_delta",
+    "index_percentile",
     "injuries_in_season",
-    "severe_injury",
+    "birth_quarter",
 ]
 
 BOOLEAN_FEATURES = {"plays_up", "severe_injury"}

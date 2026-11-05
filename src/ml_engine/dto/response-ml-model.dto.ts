@@ -54,10 +54,6 @@ export class ResponseMlModelDto {
 
   @Expose()
   @ApiProperty({ example: false })
-  is_synthetic: boolean
-
-  @Expose()
-  @ApiProperty({ example: false })
   is_active: boolean
 
   @Expose()

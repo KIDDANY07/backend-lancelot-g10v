@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { cronsEnabled } from 'src/common/utils/cron.util'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { AcwrConfigService } from 'src/acwr_config/acwr-config.service'
@@ -48,6 +49,7 @@ export class FatigueAlertsCronService {
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM, { timeZone: CLUB_TIMEZONE })
   async recalculateFatigueAlerts() {
+    if (!cronsEnabled()) return
     await this.runForDate(todayKey())
   }
 
@@ -63,7 +65,9 @@ export class FatigueAlertsCronService {
     const athleteIds = await this.usersService.findAllAthleteIds()
     summary.athletes = athleteIds.length
     const categoryByUser =
-      await this.athletesInCategoriesService.findActiveSeasonCategoryMap()
+      await this.athletesInCategoriesService.findSeasonCategoryMapForDate(
+        dateKey,
+      )
     const thresholdsCache = new ScopedConfigCache((id_category) =>
       this.acwrConfigService.getActive(id_category),
     )

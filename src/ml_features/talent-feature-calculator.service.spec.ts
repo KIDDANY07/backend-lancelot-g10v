@@ -83,6 +83,14 @@ function dataset(
       { id_user: 2, injury_date: '2024-05-01', severe: false },
     ],
     rulesFlagged: [{ id_user: 1, id_season: 1 }],
+    minutes: [
+      { id_user: 1, id_season: 2, id_category: 3, minutes: 400 },
+      { id_user: 2, id_season: 2, id_category: 2, minutes: 300 },
+    ],
+    matchCounts: [
+      { id_season: 2, id_category: 2, matches: 10 },
+      { id_season: 2, id_category: 3, matches: 10 },
+    ],
     today: '2026-10-18',
     ...overrides,
   }
@@ -91,7 +99,7 @@ function dataset(
 describe('TalentFeatureCalculatorService', () => {
   const service = new TalentFeatureCalculatorService()
 
-  it('labels as promoted who plays above the category of his age next season', () => {
+  it('labels as promoted who plays at least 30% of the minutes above the category of his age next season', () => {
     const rows = service.buildRows(dataset())
     const byUser = (id_user: number, id_season: number) =>
       rows.find((row) => row.id_user === id_user && row.id_season === id_season)
@@ -113,6 +121,30 @@ describe('TalentFeatureCalculatorService', () => {
       severe_injury: true,
       birth_quarter: 4,
     })
+  })
+
+  it('does not label as promoted who is only enrolled above his age without minutes', () => {
+    const rows = service.buildRows(
+      dataset({
+        minutes: [{ id_user: 1, id_season: 2, id_category: 3, minutes: 200 }],
+      }),
+    )
+    expect(
+      rows.find((row) => row.id_user === 1 && row.id_season === 1)
+        ?.label_promoted,
+    ).toBe(false)
+  })
+
+  it('labels as consolidated who plays at least half of the minutes of his base category', () => {
+    const rows = service.buildRows(
+      dataset({
+        minutes: [{ id_user: 2, id_season: 2, id_category: 2, minutes: 450 }],
+      }),
+    )
+    expect(
+      rows.find((row) => row.id_user === 2 && row.id_season === 1)
+        ?.label_promoted,
+    ).toBe(true)
   })
 
   it('excludes who left the club and keeps the last season pending', () => {

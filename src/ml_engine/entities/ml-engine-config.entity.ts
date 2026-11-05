@@ -23,10 +23,10 @@ export class MlEngineConfig {
   @Column({ type: 'int', default: 270 })
   min_labeled_days: number
 
-  @Column({ type: 'int', default: 30 })
+  @Column({ type: 'int', default: 20 })
   min_non_contact_injuries: number
 
-  @Column({ type: 'int', default: 20 })
+  @Column({ type: 'int', default: 15 })
   min_athletes: number
 
   @Column({ type: 'decimal', precision: 4, scale: 3, default: 0.25 })
@@ -44,7 +44,7 @@ export class MlEngineConfig {
   @Column({ type: 'int', default: 10 })
   talent_min_promotions: number
 
-  @Column({ type: 'int', default: 30 })
+  @Column({ type: 'int', default: 15 })
   talent_min_athletes: number
 
   @Column({ type: 'decimal', precision: 4, scale: 3, default: 0.5 })

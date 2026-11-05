@@ -91,7 +91,7 @@ export class MlModelsController {
   @Put('id/:id/activate')
   @ApiOperation({
     summary:
-      'Activar un modelo: exige que no sea sintético, que se cumpla la readiness de su tarea y que su PR-AUC supere a la de las reglas en el mismo conjunto de prueba. Solo reemplaza al modelo activo de su misma tarea',
+      'Activar un modelo: exige que use la versión de variables actual de su tarea. Informa en warnings si aún no se cumple la readiness o si su PR-AUC no supera a la de las reglas en el mismo conjunto de prueba. Solo reemplaza al modelo activo de su misma tarea',
   })
   @ApiParam({ name: 'id', type: Number })
   activate(@Param('id', ParseIntPipe) id_model: number) {

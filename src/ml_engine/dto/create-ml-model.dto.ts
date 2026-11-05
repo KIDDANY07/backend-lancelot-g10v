@@ -3,12 +3,12 @@ import { Type } from 'class-transformer'
 import {
   ArrayNotEmpty,
   IsArray,
-  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Length,
@@ -75,6 +75,41 @@ export class MlModelMetricsDto {
   @Min(0)
   @ApiPropertyOptional({ example: 9, nullable: true })
   positives_test?: number | null
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @ApiPropertyOptional({
+    example: 0.08,
+    nullable: true,
+    description:
+      'Probabilidad calibrada a partir de la cual el modelo clasifica el riesgo como medio, elegida con los datos de validación',
+  })
+  threshold_medium?: number | null
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @ApiPropertyOptional({
+    example: 0.2,
+    nullable: true,
+    description:
+      'Probabilidad calibrada a partir de la cual el modelo clasifica el riesgo como alto',
+  })
+  threshold_high?: number | null
+
+  @IsOptional()
+  @IsObject()
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+    description:
+      'Resumen de la validación por ventanas temporales y dejando un deportista fuera',
+  })
+  validation?: Record<string, unknown> | null
 }
 
 export class CreateMlModelDto {
@@ -148,14 +183,6 @@ export class CreateMlModelDto {
   @IsDateString()
   @ApiProperty({ example: '2026-01-31', format: 'date' })
   test_to: string
-
-  @IsBoolean()
-  @ApiProperty({
-    example: false,
-    description:
-      'true si se entrenó con datos sintéticos o insuficientes; un modelo sintético nunca puede activarse',
-  })
-  is_synthetic: boolean
 
   @IsOptional()
   @IsString()

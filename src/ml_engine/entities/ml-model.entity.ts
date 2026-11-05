@@ -21,6 +21,9 @@ export interface MlModelMetrics {
   n_train?: number | null
   n_test?: number | null
   positives_test?: number | null
+  threshold_medium?: number | null
+  threshold_high?: number | null
+  validation?: Record<string, unknown> | null
 }
 
 @Index('UQ_ml_models_version', ['version'], { unique: true })
@@ -65,9 +68,6 @@ export class MlModel {
 
   @Column({ type: 'date' })
   test_to: string
-
-  @Column({ type: 'boolean', default: false })
-  is_synthetic: boolean
 
   @Column({ type: 'boolean', default: false })
   is_active: boolean

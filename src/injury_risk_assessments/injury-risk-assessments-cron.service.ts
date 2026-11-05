@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { cronsEnabled } from 'src/common/utils/cron.util'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { AcwrConfigService } from 'src/acwr_config/acwr-config.service'
@@ -7,9 +8,11 @@ import { AthletesInCategoriesService } from 'src/athletes_in_categories/athletes
 import { ScopedConfigCache } from 'src/common/scoped_config/scoped-config'
 import {
   CLUB_TIMEZONE,
+  daysBetween,
   parseDateKey,
   todayKey,
 } from 'src/common/utils/date.util'
+import { RETURN_TO_PLAY_WINDOW_DAYS } from 'src/ml_features/feature-calculator.service'
 import { DailyAlertsSummary } from 'src/fatigue_alerts/fatigue-alerts-cron.service'
 import { CHRONIC_WINDOW_DAYS } from 'src/fatigue_alerts/acwr-calculator.service'
 import { LoadRecordsService } from 'src/fatigue_alerts/load-records.service'
@@ -43,6 +46,7 @@ export class InjuryRiskAssessmentsCronService {
 
   @Cron(CronExpression.EVERY_DAY_AT_4AM, { timeZone: CLUB_TIMEZONE })
   async recalculateInjuryRiskAssessments() {
+    if (!cronsEnabled()) return
     await this.runForDate(todayKey())
   }
 
@@ -58,7 +62,9 @@ export class InjuryRiskAssessmentsCronService {
     const athleteIds = await this.usersService.findAllAthleteIds()
     summary.athletes = athleteIds.length
     const categoryByUser =
-      await this.athletesInCategoriesService.findActiveSeasonCategoryMap()
+      await this.athletesInCategoriesService.findSeasonCategoryMapForDate(
+        dateKey,
+      )
     const acwrCache = new ScopedConfigCache((id_category) =>
       this.acwrConfigService.getActive(id_category),
     )
@@ -93,6 +99,25 @@ export class InjuryRiskAssessmentsCronService {
     return summary
   }
 
+  private async isRecoveringOn(id_user: number, dateKey: string) {
+    if (dateKey >= todayKey())
+      return (
+        (await this.injuriesRepository.count({
+          where: { id_user, status: InjuryStatus.RECOVERING },
+        })) > 0
+      )
+    const injuries = await this.injuriesRepository.find({
+      where: { id_user },
+      select: { injury_date: true, recovery_date: true },
+    })
+    return injuries.some(
+      (injury) =>
+        !!injury.recovery_date &&
+        injury.recovery_date <= dateKey &&
+        daysBetween(injury.recovery_date, dateKey) < RETURN_TO_PLAY_WINDOW_DAYS,
+    )
+  }
+
   private async processAthlete(
     id_user: number,
     referenceDate: Date,
@@ -116,10 +141,10 @@ export class InjuryRiskAssessmentsCronService {
       referenceDate.toISOString().slice(0, 10),
     )
 
-    const isRecoveringFromInjury =
-      (await this.injuriesRepository.count({
-        where: { id_user, status: InjuryStatus.RECOVERING },
-      })) > 0
+    const isRecoveringFromInjury = await this.isRecoveringOn(
+      id_user,
+      referenceDate.toISOString().slice(0, 10),
+    )
 
     const result = await this.rulesInjuryRiskPredictor.predict({
       records,

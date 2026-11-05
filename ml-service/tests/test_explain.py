@@ -7,8 +7,8 @@ from app.train import build_candidates
 
 
 @pytest.fixture(scope="module")
-def fitted_bundles(synthetic_dataset):
-    rows = filter_training_rows(synthetic_dataset)
+def fitted_bundles(daily_dataset):
+    rows = filter_training_rows(daily_dataset)
     matrix = prepare_matrix(rows)
     bundles = {}
     for candidate in build_candidates():
@@ -22,7 +22,7 @@ def test_top_factors_shape_for_each_model_kind(fitted_bundles, kind):
     bundles, matrix = fitted_bundles
     factors = top_factors(bundles[kind], matrix.iloc[[0]])
 
-    assert len(factors) == TOP_FACTORS
+    assert len(factors) == min(TOP_FACTORS, len(FEATURES))
     assert all(factor["feature"] in FEATURES for factor in factors)
     magnitudes = [abs(factor["contribution"]) for factor in factors]
     assert magnitudes == sorted(magnitudes, reverse=True)

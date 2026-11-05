@@ -58,7 +58,7 @@ export class MlEngineController {
   @ApiSecurity('mlServiceApiKey')
   @ApiOperation({
     summary:
-      'Readiness de la fase 2: datos etiquetados disponibles frente a los mínimos (aprox. una temporada completa). Acepta JWT o la cabecera x-api-key del servicio de ML',
+      'Readiness de la fase 2: datos etiquetados disponibles frente a los mínimos. Los días etiquetados son fechas distintas del calendario (no deportista-día). Los mínimos por defecto (270 días, 20 lesiones sin contacto y 15 deportistas) se ajustaron al tamaño real de la plantilla del club: con unos 15 deportistas no se alcanzan 20 deportistas ni 30 lesiones sin contacto en una temporada. Es informativa: indica si los datos alcanzan para un modelo confiable. Acepta JWT o la cabecera x-api-key del servicio de ML',
   })
   getReadiness() {
     return this.mlReadinessService.getReadinessResponse()
@@ -70,7 +70,7 @@ export class MlEngineController {
   @ApiSecurity('mlServiceApiKey')
   @ApiOperation({
     summary:
-      'Readiness del modelo de talento: temporadas con ascensos reales etiquetados frente a los mínimos. Acepta JWT o la cabecera x-api-key del servicio de ML',
+      'Readiness del modelo de talento: temporadas etiquetadas con ascensos o consolidaciones reales frente a los mínimos. La unidad es deportista por temporada; el mínimo de 15 deportistas corresponde al tamaño de la plantilla del club. Es informativa. Acepta JWT o la cabecera x-api-key del servicio de ML',
   })
   getTalentReadiness() {
     return this.talentReadinessService.getReadinessResponse()

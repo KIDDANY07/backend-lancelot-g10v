@@ -2,7 +2,7 @@ import hmac
 import logging
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
 
@@ -13,7 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app import backend_client
 from app.backend_client import BackendError
 from app.config import get_settings
-from app.db import load_dataset_from_csv, load_dataset_from_db, load_talent_dataset_from_db
+from app.db import load_dataset_from_db, load_talent_dataset_from_db
 from app.predict import ModelNotAvailable, ModelStore
 from app.talent_features import TALENT_FEATURE_VERSION, prepare_talent_matrix
 from app.train import TrainingError, TrainingResult, train_model, train_talent_model
@@ -70,12 +70,6 @@ class PredictResponse(BaseModel):
     model_version: str
 
 
-class TrainRequest(BaseModel):
-    source: Literal["db", "csv"] = "db"
-    csv_path: str | None = None
-    allow_insufficient_data: bool = False
-
-
 @app.get("/health")
 def health() -> dict:
     return {
@@ -105,63 +99,44 @@ def predict_talent(request: PredictRequest) -> dict:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
-def _unmet_criteria(readiness: dict) -> str:
-    unmet = [
+def _unmet_criteria(readiness: dict) -> list[str]:
+    return [
         f"{criterion.get('descripcion', criterion.get('code'))}: {criterion.get('value')} de {criterion.get('minimum')}"
         for criterion in readiness.get("criteria", [])
         if not criterion.get("met")
     ]
-    return "; ".join(unmet) or "criterios no informados"
+
+
+def _readiness_summary(get_readiness: Callable[[], dict]) -> dict[str, Any]:
+    try:
+        readiness = get_readiness()
+    except BackendError as error:
+        return {"ready": None, "pending": [f"No se pudo consultar la readiness: {error}"]}
+    return {"ready": bool(readiness.get("ready")), "pending": _unmet_criteria(readiness)}
 
 
 def _run_training(
-    request: TrainRequest,
     *,
     get_readiness: Callable[[], dict],
     load_from_db: Callable[[str], pd.DataFrame],
     trainer: Callable[..., TrainingResult],
-    insufficient_detail: str,
 ) -> dict[str, Any]:
+    settings = get_settings()
+    if not settings.database_url:
+        raise HTTPException(status_code=400, detail="DATABASE_URL no está configurada")
+    readiness = _readiness_summary(get_readiness)
     try:
-        readiness = get_readiness()
-    except BackendError as error:
+        dataset = load_from_db(settings.database_url)
+    except SQLAlchemyError as error:
+        logger.error("No se pudo leer la base de datos: %s", error)
+        reason = str(getattr(error, "orig", None) or error).splitlines()[0]
         raise HTTPException(
-            status_code=502, detail=f"No se pudo verificar la readiness en el backend: {error}"
+            status_code=502,
+            detail=f"El servicio de ML no pudo leer la base de datos (revise DATABASE_URL): {reason}",
         ) from error
 
-    ready = bool(readiness.get("ready"))
-    if not ready and not request.allow_insufficient_data:
-        raise HTTPException(
-            status_code=409,
-            detail=f"{insufficient_detail} Pendiente: {_unmet_criteria(readiness)}. "
-            "Use allow_insufficient_data=true solo para probar el pipeline; el modelo quedará "
-            "marcado como sintético y nunca podrá activarse.",
-        )
-
-    settings = get_settings()
-    if request.source == "csv":
-        if not request.csv_path:
-            raise HTTPException(status_code=400, detail="Debe indicar csv_path cuando source es csv")
-        try:
-            dataset = load_dataset_from_csv(request.csv_path)
-        except FileNotFoundError as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
-    else:
-        if not settings.database_url:
-            raise HTTPException(status_code=400, detail="DATABASE_URL no está configurada")
-        try:
-            dataset = load_from_db(settings.database_url)
-        except SQLAlchemyError as error:
-            logger.error("No se pudo leer la base de datos: %s", error)
-            reason = str(getattr(error, "orig", None) or error).splitlines()[0]
-            raise HTTPException(
-                status_code=502,
-                detail=f"El servicio de ML no pudo leer la base de datos (revise DATABASE_URL): {reason}",
-            ) from error
-
-    is_synthetic = (not ready) or request.source == "csv"
     try:
-        result = trainer(dataset, is_synthetic=is_synthetic, models_dir=settings.models_dir)
+        result = trainer(dataset, models_dir=settings.models_dir)
     except TrainingError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -174,34 +149,28 @@ def _run_training(
         ) from error
 
     return {
-        "mensaje": "Modelo entrenado y registrado en el backend"
-        + (" como sintético (no activable)" if is_synthetic else ""),
+        "mensaje": "Modelo entrenado y registrado en el backend",
         "model": result.payload,
         "candidates": result.candidates,
+        "readiness": readiness,
     }
 
 
 @app.post("/train", dependencies=[Depends(require_api_key)])
-def train(request: TrainRequest) -> dict:
+def train() -> dict:
     return _run_training(
-        request,
         get_readiness=backend_client.get_readiness,
         load_from_db=load_dataset_from_db,
         trainer=train_model,
-        insufficient_detail="No hay datos suficientes para entrenar un modelo real (fase 2 "
-        "condicionada a una temporada completa).",
     )
 
 
 @app.post("/talent/train", dependencies=[Depends(require_api_key)])
-def train_talent(request: TrainRequest) -> dict:
+def train_talent() -> dict:
     return _run_training(
-        request,
         get_readiness=backend_client.get_talent_readiness,
         load_from_db=load_talent_dataset_from_db,
         trainer=train_talent_model,
-        insufficient_detail="No hay temporadas suficientes con ascensos reales para entrenar "
-        "un modelo de talento real.",
     )
 
 

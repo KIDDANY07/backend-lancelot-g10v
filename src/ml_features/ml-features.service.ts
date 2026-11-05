@@ -234,10 +234,13 @@ export class MlFeaturesService {
     from?: string
     to?: string
     onlyUnlabeled: boolean
+    asOf?: string
   }) {
-    const maxMatureDate = addDaysToKey(todayKey(), -LABEL_WINDOW_DAYS)
+    const asOf = options.asOf ?? todayKey()
+    const maxMatureDate = addDaysToKey(asOf, -LABEL_WINDOW_DAYS)
     const to =
       options.to && options.to < maxMatureDate ? options.to : maxMatureDate
+    if (!options.onlyUnlabeled) await this.resetImmatureRows(options, to)
 
     const usersQuery = this.featuresRepository
       .createQueryBuilder('features')
@@ -283,6 +286,24 @@ export class MlFeaturesService {
       unknown_mechanism: counts.unknown,
       failed,
     }
+  }
+
+  private async resetImmatureRows(
+    options: { from?: string; to?: string },
+    maxMatureDate: string,
+  ) {
+    const query = this.featuresRepository
+      .createQueryBuilder()
+      .update(AthleteDailyFeatures)
+      .set({
+        label_injury_7d: null,
+        label_quality: FeatureLabelQuality.PENDING,
+        labeled_at: null,
+      })
+      .where('date > :maxMatureDate', { maxMatureDate })
+    if (options.from) query.andWhere('date >= :from', { from: options.from })
+    if (options.to) query.andWhere('date <= :to', { to: options.to })
+    await query.execute()
   }
 
   private async labelAthleteRows(
@@ -332,15 +353,29 @@ export class MlFeaturesService {
     return result
   }
 
-  async backfill(from: string, to: string) {
+  private validateAsOf(asOf: string | undefined) {
+    if (asOf && asOf > todayKey())
+      throw new BadRequestException({
+        status: 'Error',
+        mensaje: 'La fecha de corte no puede ser futura',
+      })
+  }
+
+  async backfill(from: string, to: string, asOf?: string) {
     this.validateRange(from, to)
-    if (to > todayKey())
+    this.validateAsOf(asOf)
+    if (to > (asOf ?? todayKey()))
       throw new BadRequestException({
         status: 'Error',
         mensaje: 'No se pueden generar snapshots de fechas futuras',
       })
     const snapshot = await this.buildSnapshots(from, to)
-    const labels = await this.labelRows({ from, to, onlyUnlabeled: false })
+    const labels = await this.labelRows({
+      from,
+      to,
+      onlyUnlabeled: false,
+      asOf,
+    })
     return {
       status: 'Success',
       mensaje: `Reconstrucción de snapshots completada: ${snapshot.snapshots} snapshots de ${snapshot.athletes} deportistas`,
@@ -349,9 +384,15 @@ export class MlFeaturesService {
     }
   }
 
-  async relabel(from: string, to: string) {
+  async relabel(from: string, to: string, asOf?: string) {
     this.validateRange(from, to)
-    const labels = await this.labelRows({ from, to, onlyUnlabeled: false })
+    this.validateAsOf(asOf)
+    const labels = await this.labelRows({
+      from,
+      to,
+      onlyUnlabeled: false,
+      asOf,
+    })
     return {
       status: 'Success',
       mensaje: `Re-etiquetado completado: ${labels.processed} snapshots procesados (solo se etiquetan los días con 7 días cumplidos)`,

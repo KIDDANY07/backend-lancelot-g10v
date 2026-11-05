@@ -24,6 +24,19 @@ export class FeatureDateRangeDto {
   to: string
 }
 
+export class FeatureBackfillRangeDto extends FeatureDateRangeDto {
+  @IsOptional()
+  @IsDateString()
+  @Matches(DATE_KEY, { message: DATE_KEY_MESSAGE })
+  @ApiPropertyOptional({
+    example: '2026-10-30',
+    format: 'date',
+    description:
+      'Fecha de corte que se toma como el día actual del histórico (por defecto, hoy). Solo se etiquetan los días con sus 7 días siguientes completos antes de esta fecha; los posteriores quedan pendientes y no se marcan como sin lesión',
+  })
+  as_of?: string
+}
+
 export class OptionalFeatureDateRangeDto {
   @IsOptional()
   @IsDateString()

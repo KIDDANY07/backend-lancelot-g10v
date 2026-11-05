@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pandas as pd
 from sqlalchemy import create_engine, text
 
@@ -7,6 +5,7 @@ from app.features import FEATURE_VERSION, FEATURES
 from app.talent_features import TALENT_FEATURE_VERSION, TALENT_FEATURES
 
 DATASET_COLUMNS = [
+    "id_user",
     "date",
     *FEATURES,
     "is_available",
@@ -28,6 +27,7 @@ DATASET_QUERY = text(
 
 
 TALENT_DATASET_COLUMNS = [
+    "id_user",
     "season_start",
     *TALENT_FEATURES,
     "rules_flagged",
@@ -73,10 +73,3 @@ def load_dataset_from_db(database_url: str) -> pd.DataFrame:
             )
     finally:
         engine.dispose()
-
-
-def load_dataset_from_csv(csv_path: str) -> pd.DataFrame:
-    path = Path(csv_path)
-    if not path.is_file():
-        raise FileNotFoundError(f"No existe el archivo CSV {csv_path}")
-    return pd.read_csv(path)

@@ -8,10 +8,14 @@ from app.features import FEATURES
 TOP_FACTORS = 3
 
 
+def explain_pipeline(bundle: dict[str, Any]) -> Any:
+    return bundle.get("explain_model") or bundle["model"]
+
+
 def build_tree_explainer(bundle: dict[str, Any]) -> Any:
     import shap
 
-    return shap.TreeExplainer(bundle["model"].named_steps["classifier"])
+    return shap.TreeExplainer(explain_pipeline(bundle).named_steps["classifier"])
 
 
 def _positive_class_contributions(values: Any) -> np.ndarray:
@@ -26,7 +30,7 @@ def _positive_class_contributions(values: Any) -> np.ndarray:
 def contributions(
     bundle: dict[str, Any], row: pd.DataFrame, explainer: Any = None
 ) -> np.ndarray:
-    pipeline = bundle["model"]
+    pipeline = explain_pipeline(bundle)
     imputed = pipeline.named_steps["imputer"].transform(row)
     if bundle["kind"] == "logistic":
         standardized = pipeline.named_steps["scaler"].transform(imputed)

@@ -78,9 +78,24 @@ export class AthletesInCategoriesService {
 
   async findActiveSeasonCategoryMap(): Promise<Map<number, number>> {
     const season = await this.seasonsService.findCurrentActive()
-    if (!season) return new Map()
+    return this.buildSeasonCategoryMap(season?.id_season)
+  }
+
+  async findSeasonCategoryMapForDate(
+    dateKey: string,
+  ): Promise<Map<number, number>> {
+    const season =
+      (await this.seasonsService.findForDate(dateKey)) ??
+      (await this.seasonsService.findCurrentActive())
+    return this.buildSeasonCategoryMap(season?.id_season)
+  }
+
+  private async buildSeasonCategoryMap(
+    id_season: number | undefined,
+  ): Promise<Map<number, number>> {
+    if (!id_season) return new Map()
     const assignments = await this.athInCatRepository.find({
-      where: { id_season: season.id_season },
+      where: { id_season },
       relations: { category: true },
     })
     const base = pickBaseAssignments(assignments, (assignment) =>

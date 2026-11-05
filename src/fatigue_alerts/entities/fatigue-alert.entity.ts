@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -21,6 +22,7 @@ export enum FatigueAlertStatus {
   DISMISSED = 'dismissed',
 }
 
+@Index('UQ_fatigue_alerts_user_date', ['id_user', 'date'], { unique: true })
 @Entity('fatigue_alerts')
 export class FatigueAlert {
   @PrimaryGeneratedColumn()

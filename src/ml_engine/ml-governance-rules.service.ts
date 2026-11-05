@@ -54,7 +54,6 @@ export interface EngineBehavior {
 }
 
 export interface ModelActivationCandidate {
-  is_synthetic: boolean
   feature_version: string
   metrics: MlModelMetrics
   rules_baseline_metrics?: MlModelMetrics | null
@@ -109,7 +108,7 @@ export class MlGovernanceRulesService {
       {
         code: ReadinessCriterionCode.PROMOTIONS,
         descripcion:
-          'Ascensos reales: deportistas que la temporada siguiente jugaron en una categoría superior a la de su edad',
+          'Ascensos o consolidaciones reales: deportistas que la temporada siguiente jugaron al menos la mitad de los minutos de su categoría base o al menos el 30 % de los minutos de una categoría superior a la de su edad',
         value: stats.promotions,
         minimum: Number(minimums.talent_min_promotions),
       },
@@ -151,43 +150,44 @@ export class MlGovernanceRulesService {
 
   checkEngineChange(
     engine: MlEngineMode,
-    context: { hasActiveModel: boolean; ready: boolean },
+    context: { hasActiveModel: boolean },
   ): string | null {
     if (engine === MlEngineMode.RULES) return null
     if (!context.hasActiveModel)
       return `No se puede usar el modo ${engine}: no hay un modelo de ML activo`
-    if (engine === MlEngineMode.ML && !context.ready)
-      return 'No se puede usar el modo ml: no se cumplen los mínimos de datos (readiness). Use el modo shadow mientras se acumulan datos'
     return null
   }
 
   checkModelActivation(
     model: ModelActivationCandidate,
-    context: { ready: boolean; currentFeatureVersion: string },
+    context: { currentFeatureVersion: string },
   ): string[] {
-    const reasons: string[] = []
-    if (model.is_synthetic)
-      reasons.push(
-        'El modelo se entrenó con datos sintéticos o insuficientes y nunca puede activarse',
-      )
-    if (!context.ready)
-      reasons.push(
-        'No se cumplen los mínimos de datos (readiness) para usar un modelo de ML',
-      )
     if (model.feature_version !== context.currentFeatureVersion)
-      reasons.push(
+      return [
         `El modelo usa las variables ${model.feature_version} y el snapshot actual genera ${context.currentFeatureVersion}`,
+      ]
+    return []
+  }
+
+  activationWarnings(
+    model: ModelActivationCandidate,
+    context: { ready: boolean },
+  ): string[] {
+    const warnings: string[] = []
+    if (!context.ready)
+      warnings.push(
+        'Aún no se cumplen los mínimos de datos (readiness): interprete las predicciones con cautela',
       )
     const modelPrAuc = model.metrics?.pr_auc
     const rulesPrAuc = model.rules_baseline_metrics?.pr_auc
     if (typeof modelPrAuc !== 'number' || typeof rulesPrAuc !== 'number')
-      reasons.push(
+      warnings.push(
         'Faltan las métricas PR-AUC del modelo o de la línea base de reglas para compararlos',
       )
     else if (modelPrAuc <= rulesPrAuc)
-      reasons.push(
-        `El modelo no supera a las reglas: PR-AUC ${modelPrAuc} frente a ${rulesPrAuc} de la línea base`,
+      warnings.push(
+        `El modelo no supera a las reglas: PR-AUC ${modelPrAuc} frente a ${rulesPrAuc} de la línea base. Se recomienda el modo shadow`,
       )
-    return reasons
+    return warnings
   }
 }

@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 from app import backend_client, main
+from app.features import FEATURES
 from app.predict import ModelStore
 from app.train import train_model
 
@@ -44,10 +45,9 @@ def client(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def trained_version(synthetic_dataset, tmp_path, monkeypatch):
+def trained_version(daily_dataset, tmp_path, monkeypatch):
     result = train_model(
-        synthetic_dataset,
-        is_synthetic=True,
+        daily_dataset,
         models_dir=tmp_path,
         now=datetime(2026, 10, 1, tzinfo=timezone.utc),
     )
@@ -89,7 +89,7 @@ def test_predict_output_shape(client, trained_version):
     assert set(body) == {"probability", "top_factors", "model_version"}
     assert 0 <= body["probability"] <= 1
     assert body["model_version"] == trained_version
-    assert len(body["top_factors"]) == 3
+    assert len(body["top_factors"]) == min(3, len(FEATURES))
     for factor in body["top_factors"]:
         assert set(factor) == {"feature", "contribution"}
         assert factor["feature"] in FEATURES_PAYLOAD
@@ -108,8 +108,9 @@ def test_predict_ignores_unknown_and_missing_features(client, trained_version):
     assert all(f["feature"] != "nombre" for f in response.json()["top_factors"])
 
 
-def test_train_is_rejected_without_enough_data(client, monkeypatch):
+def test_train_reports_pending_readiness_without_blocking(client, monkeypatch, daily_dataset):
     registered = []
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setattr(
         backend_client,
         "get_readiness",
@@ -117,40 +118,21 @@ def test_train_is_rejected_without_enough_data(client, monkeypatch):
             "ready": False,
             "criteria": [
                 {"code": "dias_etiquetados", "descripcion": "Días etiquetados", "value": 40, "minimum": 270, "met": False},
-                {"code": "deportistas", "descripcion": "Deportistas", "value": 22, "minimum": 20, "met": True},
+                {"code": "deportistas", "descripcion": "Deportistas", "value": 22, "minimum": 15, "met": True},
             ],
         },
     )
+    monkeypatch.setattr(main, "load_dataset_from_db", lambda _url: daily_dataset)
     monkeypatch.setattr(backend_client, "register_model", lambda payload: registered.append(payload))
 
-    response = client.post("/train", json={"source": "db"}, headers=HEADERS)
-
-    assert response.status_code == 409
-    assert "No hay datos suficientes" in response.json()["detail"]
-    assert "Días etiquetados: 40 de 270" in response.json()["detail"]
-    assert "Deportistas" not in response.json()["detail"]
-    assert registered == []
-
-
-def test_train_with_insufficient_data_allowed_registers_a_synthetic_model(
-    client, monkeypatch, synthetic_dataset, tmp_path
-):
-    csv_path = tmp_path / "synthetic.csv"
-    synthetic_dataset.to_csv(csv_path, index=False)
-    registered = []
-    monkeypatch.setattr(backend_client, "get_readiness", lambda: {"ready": False, "criteria": []})
-    monkeypatch.setattr(backend_client, "register_model", lambda payload: registered.append(payload))
-
-    response = client.post(
-        "/train",
-        json={"source": "csv", "csv_path": str(csv_path), "allow_insufficient_data": True},
-        headers=HEADERS,
-    )
+    response = client.post("/train", headers=HEADERS)
 
     assert response.status_code == 200
     assert len(registered) == 1
-    assert registered[0]["is_synthetic"] is True
-    assert "sintético" in response.json()["mensaje"]
+    assert "is_synthetic" not in registered[0]
+    readiness = response.json()["readiness"]
+    assert readiness["ready"] is False
+    assert readiness["pending"] == ["Días etiquetados: 40 de 270"]
 
 
 def test_train_reports_an_unreachable_database_as_502(client, monkeypatch):
@@ -163,7 +145,7 @@ def test_train_reports_an_unreachable_database_as_502(client, monkeypatch):
     monkeypatch.setattr(backend_client, "get_readiness", lambda: {"ready": True, "criteria": []})
     monkeypatch.setattr(main, "load_dataset_from_db", unreachable)
 
-    response = client.post("/train", json={"source": "db"}, headers=HEADERS)
+    response = client.post("/train", headers=HEADERS)
 
     assert response.status_code == 502
     assert "DATABASE_URL" in response.json()["detail"]
