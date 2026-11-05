@@ -33,6 +33,18 @@ function steadyBaseline(referenceDate: Date) {
   return records
 }
 
+function lightBaseline(referenceDate: Date) {
+  const records: { date: string; rpe: number; duration_min: number }[] = []
+  for (let daysBack = 27; daysBack >= 7; daysBack--) {
+    records.push({
+      date: offsetDate(referenceDate, daysBack),
+      rpe: 2,
+      duration_min: 20,
+    })
+  }
+  return records
+}
+
 describe('InjuryRiskRulesService', () => {
   let service: InjuryRiskRulesService
   const referenceDate = new Date('2026-03-28T12:00:00Z')
@@ -44,6 +56,7 @@ describe('InjuryRiskRulesService', () => {
   describe('sustained ACWR rule (> 1.5 for 2+ consecutive days)', () => {
     it('triggers when today and yesterday both exceed the threshold', () => {
       const records = [
+        ...lightBaseline(referenceDate),
         { date: offsetDate(referenceDate, 0), rpe: 10, duration_min: 100 },
         { date: offsetDate(referenceDate, 1), rpe: 10, duration_min: 100 },
       ]
@@ -133,6 +146,7 @@ describe('InjuryRiskRulesService', () => {
 
   describe('relapse rule (recovering injury + high ACWR today)', () => {
     const spikeRecords = [
+      ...lightBaseline(referenceDate),
       { date: offsetDate(referenceDate, 0), rpe: 10, duration_min: 100 },
     ]
 
@@ -164,6 +178,7 @@ describe('InjuryRiskRulesService', () => {
   describe('risk level aggregation', () => {
     it('returns alto when two or more rules trigger simultaneously', () => {
       const records = [
+        ...lightBaseline(referenceDate),
         { date: offsetDate(referenceDate, 0), rpe: 10, duration_min: 100 },
         { date: offsetDate(referenceDate, 1), rpe: 10, duration_min: 100 },
       ]
@@ -234,6 +249,7 @@ describe('InjuryRiskRulesService', () => {
 
     it('stops triggering the sustained-ACWR rule when the threshold is configured higher', () => {
       const records = [
+        ...lightBaseline(referenceDate),
         { date: offsetDate(referenceDate, 0), rpe: 10, duration_min: 100 },
         { date: offsetDate(referenceDate, 1), rpe: 10, duration_min: 100 },
       ]

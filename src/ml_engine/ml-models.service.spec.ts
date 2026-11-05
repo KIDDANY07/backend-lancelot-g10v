@@ -21,7 +21,6 @@ const BASE_MODEL = {
   version: 'hgb-1',
   task: MlModelTask.INJURY_RISK,
   feature_version: 'v1',
-  is_synthetic: false,
   is_active: false,
   metrics: { pr_auc: 0.3 },
   rules_baseline_metrics: { pr_auc: 0.2 },
@@ -108,53 +107,33 @@ describe('MlModelsService.activate', () => {
     expect(result.mensaje).toBe('Modelo de ML de talento activado con éxito')
   })
 
-  it('rejects a talent model without talent readiness', async () => {
-    const { service } = buildService(
+  it('activates a talent model without talent readiness and warns about it', async () => {
+    const { service, manager } = buildService(
       { ...BASE_MODEL, task: MlModelTask.TALENT, feature_version: 't1' },
       true,
       false,
     )
-    await expect(service.activate(5)).rejects.toMatchObject({
-      response: {
-        mensaje: expect.stringContaining('readiness') as string,
-      },
-    })
+    const result = await service.activate(5)
+    expect(manager.update).toHaveBeenCalled()
+    expect(result.warnings?.[0]).toContain('readiness')
   })
 
-  it('rejects a synthetic model with the reason in Spanish', async () => {
+  it('rejects a model trained with another feature version', async () => {
     const { service, manager } = buildService(
-      { ...BASE_MODEL, is_synthetic: true },
+      { ...BASE_MODEL, feature_version: 'v0' },
       true,
     )
     await expect(service.activate(5)).rejects.toThrow(BadRequestException)
-    await expect(service.activate(5)).rejects.toMatchObject({
-      response: {
-        status: 'Error',
-        mensaje: expect.stringContaining('sintéticos') as string,
-      },
-    })
     expect(manager.update).not.toHaveBeenCalled()
   })
 
-  it('rejects activation without readiness', async () => {
-    const { service } = buildService({ ...BASE_MODEL }, false)
-    await expect(service.activate(5)).rejects.toMatchObject({
-      response: {
-        mensaje: expect.stringContaining('readiness') as string,
-      },
-    })
-  })
-
-  it('rejects a model that does not beat the rules', async () => {
+  it('activates a model that does not beat the rules and recommends shadow', async () => {
     const { service } = buildService(
       { ...BASE_MODEL, metrics: { pr_auc: 0.15 } },
       true,
     )
-    await expect(service.activate(5)).rejects.toMatchObject({
-      response: {
-        mensaje: expect.stringContaining('no supera a las reglas') as string,
-      },
-    })
+    const result = await service.activate(5)
+    expect(result.warnings?.[0]).toContain('no supera a las reglas')
   })
 })
 

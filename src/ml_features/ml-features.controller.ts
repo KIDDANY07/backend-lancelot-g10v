@@ -11,6 +11,7 @@ import { Roles } from 'src/auth/decorators/roles.decorator'
 import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 import {
+  FeatureBackfillRangeDto,
   FeatureDateRangeDto,
   OptionalFeatureDateRangeDto,
 } from './dto/feature-date-range.dto'
@@ -30,9 +31,9 @@ export class MlFeaturesController {
     summary:
       'Reconstruir los snapshots diarios de variables de un rango de fechas a partir de los datos ya cargados (útil cuando el club digita datos tarde) y etiquetar los días maduros',
   })
-  @ApiQuery({ type: FeatureDateRangeDto })
-  backfill(@Query() query: FeatureDateRangeDto) {
-    return this.mlFeaturesService.backfill(query.from, query.to)
+  @ApiQuery({ type: FeatureBackfillRangeDto })
+  backfill(@Query() query: FeatureBackfillRangeDto) {
+    return this.mlFeaturesService.backfill(query.from, query.to, query.as_of)
   }
 
   @Roles('ADMIN')
@@ -41,9 +42,9 @@ export class MlFeaturesController {
     summary:
       'Recalcular las etiquetas (lesión sin contacto en los 7 días siguientes) de un rango, p. ej. tras registrar o corregir lesiones tarde',
   })
-  @ApiQuery({ type: FeatureDateRangeDto })
-  relabel(@Query() query: FeatureDateRangeDto) {
-    return this.mlFeaturesService.relabel(query.from, query.to)
+  @ApiQuery({ type: FeatureBackfillRangeDto })
+  relabel(@Query() query: FeatureBackfillRangeDto) {
+    return this.mlFeaturesService.relabel(query.from, query.to, query.as_of)
   }
 
   @Roles('ADMIN', 'ENCARGADO_SALUD')

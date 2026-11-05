@@ -39,47 +39,47 @@ TALENT_PAYLOAD = {
 }
 
 
-def test_prepare_talent_matrix_keeps_the_whitelist_and_booleans():
+def test_prepare_talent_matrix_keeps_only_the_whitelist():
     matrix = prepare_talent_matrix(
         pd.DataFrame([{**TALENT_PAYLOAD, "plays_up": "true", "nombre": "Ana"}])
     )
     assert list(matrix.columns) == TALENT_FEATURES
-    assert matrix.loc[0, "plays_up"] == 1.0
+    assert "plays_up" not in matrix.columns
+    assert "nombre" not in matrix.columns
     assert pd.isna(matrix.loc[0, "tactical_score"])
 
 
-def test_season_split_tests_on_the_last_labeled_season(synthetic_talent_dataset):
-    rows = filter_talent_training_rows(synthetic_talent_dataset)
+def test_season_split_tests_on_the_last_labeled_season(talent_dataset):
+    rows = filter_talent_training_rows(talent_dataset)
     train, test = season_split(rows)
     assert test["season_start"].nunique() == 1
     assert train["season_start"].max() < test["season_start"].min()
 
 
-def test_season_split_needs_two_seasons(synthetic_talent_dataset):
-    rows = filter_talent_training_rows(synthetic_talent_dataset)
+def test_season_split_needs_two_seasons(talent_dataset):
+    rows = filter_talent_training_rows(talent_dataset)
     first = rows.loc[rows["season_start"] == rows["season_start"].min()]
     with pytest.raises(ValueError):
         season_split(first)
 
 
-def test_only_labeled_rows_of_the_current_version_are_used(synthetic_talent_dataset):
-    data = synthetic_talent_dataset.copy()
+def test_only_labeled_rows_of_the_current_version_are_used(talent_dataset):
+    data = talent_dataset.copy()
     data.loc[0, "label_quality"] = "pending"
     data.loc[1, "feature_version"] = "t0"
     rows = filter_talent_training_rows(data)
     assert len(rows) == len(data) - 2
 
 
-def test_rules_baseline_is_the_rules_flag(synthetic_talent_dataset):
-    scores = talent_rules_scores(synthetic_talent_dataset.head(5))
-    expected = synthetic_talent_dataset.head(5)["rules_flagged"].astype(float)
+def test_rules_baseline_is_the_rules_flag(talent_dataset):
+    scores = talent_rules_scores(talent_dataset.head(5))
+    expected = talent_dataset.head(5)["rules_flagged"].astype(float)
     assert scores.tolist() == expected.tolist()
 
 
-def test_train_talent_model_registers_a_talent_payload(synthetic_talent_dataset, tmp_path):
+def test_train_talent_model_registers_a_talent_payload(talent_dataset, tmp_path):
     result = train_talent_model(
-        synthetic_talent_dataset,
-        is_synthetic=True,
+        talent_dataset,
         models_dir=tmp_path,
         now=datetime(2026, 10, 18, tzinfo=timezone.utc),
     )
@@ -88,8 +88,8 @@ def test_train_talent_model_registers_a_talent_payload(synthetic_talent_dataset,
     assert payload["feature_version"] == TALENT_FEATURE_VERSION
     assert payload["features"] == TALENT_FEATURES
     assert payload["version"].startswith("talento-")
-    assert payload["version"].endswith("-synthetic")
-    assert payload["is_synthetic"] is True
+    assert "is_synthetic" not in payload
+    assert payload["metrics"]["validation"]["leave_one_athlete_out"]["athletes"] > 0
     assert payload["test_from"] == "2026-02-01"
     assert payload["metrics"]["positives_test"] > 0
     assert payload["rules_baseline_metrics"]["n_train"] is None
@@ -97,12 +97,12 @@ def test_train_talent_model_registers_a_talent_payload(synthetic_talent_dataset,
 
 
 def test_train_talent_model_rejects_a_test_season_without_promotions(
-    synthetic_talent_dataset, tmp_path
+    talent_dataset, tmp_path
 ):
-    data = synthetic_talent_dataset.copy()
+    data = talent_dataset.copy()
     data.loc[data["season_start"] == data["season_start"].max(), "label_promoted"] = False
     with pytest.raises(TrainingError, match="no tiene ascensos"):
-        train_talent_model(data, is_synthetic=True, models_dir=tmp_path)
+        train_talent_model(data, models_dir=tmp_path)
 
 
 @pytest.fixture
@@ -122,12 +122,11 @@ def test_talent_predict_without_active_model_returns_503(client):
     assert response.status_code == 503
 
 
-def test_talent_predict_uses_the_talent_model(client, monkeypatch, synthetic_talent_dataset, tmp_path):
+def test_talent_predict_uses_the_talent_model(client, monkeypatch, talent_dataset, tmp_path):
     from app.talent_features import prepare_talent_matrix as prepare
 
     result = train_talent_model(
-        synthetic_talent_dataset,
-        is_synthetic=True,
+        talent_dataset,
         models_dir=tmp_path,
         now=datetime(2026, 10, 18, tzinfo=timezone.utc),
     )
@@ -155,7 +154,11 @@ def test_talent_predict_uses_the_talent_model(client, monkeypatch, synthetic_tal
     assert all(factor["feature"] in TALENT_FEATURES for factor in body["top_factors"])
 
 
-def test_talent_train_is_rejected_without_talent_readiness(client, monkeypatch):
+def test_talent_train_registers_the_model_and_reports_readiness(
+    client, monkeypatch, talent_dataset
+):
+    registered = []
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setattr(
         backend_client,
         "get_talent_readiness",
@@ -172,25 +175,11 @@ def test_talent_train_is_rejected_without_talent_readiness(client, monkeypatch):
             ],
         },
     )
-    response = client.post("/talent/train", json={"source": "db"}, headers=HEADERS)
-    assert response.status_code == 409
-    assert "ascensos reales" in response.json()["detail"]
-    assert "Temporadas etiquetadas: 1 de 2" in response.json()["detail"]
-
-
-def test_talent_train_from_csv_registers_a_synthetic_talent_model(
-    client, monkeypatch, synthetic_talent_dataset, tmp_path
-):
-    csv_path = tmp_path / "talento.csv"
-    synthetic_talent_dataset.to_csv(csv_path, index=False)
-    registered = []
-    monkeypatch.setattr(backend_client, "get_talent_readiness", lambda: {"ready": True, "criteria": []})
+    monkeypatch.setattr(main, "load_talent_dataset_from_db", lambda _url: talent_dataset)
     monkeypatch.setattr(backend_client, "register_model", lambda payload: registered.append(payload))
 
-    response = client.post(
-        "/talent/train", json={"source": "csv", "csv_path": str(csv_path)}, headers=HEADERS
-    )
+    response = client.post("/talent/train", headers=HEADERS)
 
     assert response.status_code == 200
     assert registered[0]["task"] == "talent"
-    assert registered[0]["is_synthetic"] is True
+    assert response.json()["readiness"]["pending"] == ["Temporadas etiquetadas: 1 de 2"]

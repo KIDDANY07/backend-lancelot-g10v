@@ -69,7 +69,6 @@ describe('MlTrainingService', () => {
       jsonResponse({
         model: {
           version: 'talento-lr-2026-10-23',
-          is_synthetic: false,
           metrics: { pr_auc: 0.8123 },
           rules_baseline_metrics: { pr_auc: 0.5 },
         },
@@ -82,7 +81,7 @@ describe('MlTrainingService', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://ml-service:8000/talent/train')
     expect(init.headers).toMatchObject({ 'x-api-key': 'secret' })
-    expect(JSON.parse(init.body as string)).toEqual({ source: 'db' })
+    expect(JSON.parse(init.body as string)).toEqual({})
     expect(findResponseByVersion).toHaveBeenCalledWith('talento-lr-2026-10-23')
     expect(result.model).toEqual({
       id_model: 7,
@@ -91,10 +90,14 @@ describe('MlTrainingService', () => {
     expect(result.mensaje).toContain('PR-AUC 0.812 frente a 0.500')
   })
 
-  it('usa la ruta de riesgo y avisa cuando el modelo queda sintético', async () => {
+  it('usa la ruta de riesgo e informa la comparación con las reglas', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({
-        model: { version: 'rf-2026-10-23-synthetic', is_synthetic: true },
+        model: {
+          version: 'lr-2026-10-23',
+          metrics: { pr_auc: 0.31 },
+          rules_baseline_metrics: { pr_auc: 0.12 },
+        },
       }),
     )
     const { service } = buildService()
@@ -105,7 +108,7 @@ describe('MlTrainingService', () => {
       'http://ml-service:8000/train',
       expect.anything(),
     )
-    expect(result.mensaje).toContain('sintético')
+    expect(result.mensaje).toContain('PR-AUC 0.310 frente a 0.120')
   })
 
   it('traslada como conflicto la readiness pendiente', async () => {

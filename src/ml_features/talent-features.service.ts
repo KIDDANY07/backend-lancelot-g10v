@@ -5,6 +5,8 @@ import { AthletesInCategory } from 'src/athletes_in_categories/entities/athletes
 import { Category } from 'src/categories/entities/category.entity'
 import { todayKey } from 'src/common/utils/date.util'
 import { Injury, InjurySeverity } from 'src/injuries/entities/injury.entity'
+import { Match } from 'src/matches/entities/match.entity'
+import { MatchStatistic } from 'src/match_statistics/entities/match-statistic.entity'
 import { Season } from 'src/seasons/entities/season.entity'
 import {
   TalentFlag,
@@ -45,10 +47,54 @@ export class TalentFeaturesService {
     private readonly injuriesRepository: Repository<Injury>,
     @InjectRepository(TalentFlag)
     private readonly talentFlagsRepository: Repository<TalentFlag>,
+    @InjectRepository(MatchStatistic)
+    private readonly matchStatisticsRepository: Repository<MatchStatistic>,
     private readonly talentFeatureCalculatorService: TalentFeatureCalculatorService,
   ) {}
 
+  private async loadMinutes() {
+    const rows = await this.matchStatisticsRepository
+      .createQueryBuilder('stat')
+      .innerJoin('stat.match', 'match')
+      .innerJoin('match.competency', 'competency')
+      .select('stat.id_user', 'id_user')
+      .addSelect('competency.id_season', 'id_season')
+      .addSelect('match.id_category', 'id_category')
+      .addSelect('SUM(stat.minutes_played)', 'minutes')
+      .groupBy('stat.id_user')
+      .addGroupBy('competency.id_season')
+      .addGroupBy('match.id_category')
+      .getRawMany<Record<string, string>>()
+    return rows.map((row) => ({
+      id_user: Number(row.id_user),
+      id_season: Number(row.id_season),
+      id_category: Number(row.id_category),
+      minutes: Number(row.minutes),
+    }))
+  }
+
+  private async loadMatchCounts() {
+    const rows = await this.matchStatisticsRepository.manager
+      .createQueryBuilder(Match, 'match')
+      .innerJoin('match.competency', 'competency')
+      .select('competency.id_season', 'id_season')
+      .addSelect('match.id_category', 'id_category')
+      .addSelect('COUNT(*)', 'matches')
+      .groupBy('competency.id_season')
+      .addGroupBy('match.id_category')
+      .getRawMany<Record<string, string>>()
+    return rows.map((row) => ({
+      id_season: Number(row.id_season),
+      id_category: Number(row.id_category),
+      matches: Number(row.matches),
+    }))
+  }
+
   async rebuild(): Promise<TalentDatasetSummary> {
+    const [minutes, matchCounts] = await Promise.all([
+      this.loadMinutes(),
+      this.loadMatchCounts(),
+    ])
     const [seasons, categories, assignments, indices, injuries, flags] =
       await Promise.all([
         this.seasonsRepository.find(),
@@ -113,6 +159,8 @@ export class TalentFeaturesService {
         severe: injury.severity === InjurySeverity.SEVERA,
       })),
       rulesFlagged: flags,
+      minutes,
+      matchCounts,
       today: todayKey(),
     })
 

@@ -1,14 +1,13 @@
-import hashlib
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 
 from app.features import FEATURE_VERSION
-from app.talent_features import TALENT_FEATURE_VERSION, TALENT_FEATURES
+from app.talent_features import TALENT_FEATURE_VERSION
 
 EXPORT_COLUMNS = [
-    "athlete_key",
+    "id_user",
     "date",
     "id_season",
     "id_category",
@@ -45,7 +44,6 @@ def _ewma(values: np.ndarray, span: int) -> np.ndarray:
 def _athlete_rows(
     rng: np.random.Generator, athlete: int, start: date, days: int
 ) -> list[dict]:
-    key = hashlib.sha256(f"sintetico-{athlete}".encode()).hexdigest()[:16]
     position = POSITIONS[athlete % len(POSITIONS)]
     base_age = rng.uniform(11, 18)
     base_load = rng.uniform(250, 450)
@@ -113,7 +111,7 @@ def _athlete_rows(
 
         rows.append(
             {
-                "athlete_key": key,
+                "id_user": athlete + 1,
                 "date": current.isoformat(),
                 "id_season": 1 if current.year == start.year else 2,
                 "id_category": 1 + athlete % 3,
@@ -153,7 +151,7 @@ def _athlete_rows(
     return rows
 
 
-def generate_synthetic_dataset(
+def build_daily_dataset(
     athletes: int = 30,
     days: int = 240,
     start: date = date(2025, 2, 1),
@@ -166,10 +164,29 @@ def generate_synthetic_dataset(
     return pd.DataFrame(rows, columns=EXPORT_COLUMNS)
 
 
+TALENT_COLUMNS = [
+    "age_years",
+    "birth_quarter",
+    "years_to_category_max",
+    "plays_up",
+    "seasons_in_club",
+    "cohort_size",
+    "index_value",
+    "index_percentile",
+    "physical_score",
+    "technical_score",
+    "tactical_score",
+    "participation_score",
+    "contribution_score",
+    "index_delta",
+    "injuries_in_season",
+    "severe_injury",
+]
+
 TALENT_EXPORT_COLUMNS = [
-    "athlete_key",
+    "id_user",
     "season_start",
-    *TALENT_FEATURES,
+    *TALENT_COLUMNS,
     "rules_flagged",
     "label_promoted",
     "label_quality",
@@ -177,7 +194,7 @@ TALENT_EXPORT_COLUMNS = [
 ]
 
 
-def generate_talent_dataset(
+def build_talent_dataset(
     athletes: int = 60,
     seasons: int = 4,
     first_season: int = 2023,
@@ -186,7 +203,6 @@ def generate_talent_dataset(
     rng = np.random.default_rng(seed)
     rows: list[dict] = []
     for athlete in range(athletes):
-        key = hashlib.sha256(f"talento-sintetico-{athlete}".encode()).hexdigest()[:16]
         talent = rng.normal(0, 1)
         birth_quarter = int(rng.integers(1, 5))
         base_age = int(rng.integers(9, 15))
@@ -204,7 +220,7 @@ def generate_talent_dataset(
             rules_flagged = percentile >= 80 and dims.min() >= 40
             rows.append(
                 {
-                    "athlete_key": key,
+                    "id_user": athlete + 1,
                     "season_start": f"{first_season + season}-02-01",
                     "age_years": age,
                     "birth_quarter": birth_quarter,

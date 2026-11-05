@@ -12,8 +12,6 @@ import { MlEngineConfig } from './entities/ml-engine-config.entity'
 import { MlModelTask } from './entities/ml-model.entity'
 import { MlGovernanceRulesService } from './ml-governance-rules.service'
 import { MlModelsService } from './ml-models.service'
-import { MlReadinessService } from './ml-readiness.service'
-import { TalentReadinessService } from './talent-readiness.service'
 
 @Injectable()
 export class MlEngineConfigService implements OnApplicationBootstrap {
@@ -21,9 +19,7 @@ export class MlEngineConfigService implements OnApplicationBootstrap {
     @InjectRepository(MlEngineConfig)
     private readonly mlEngineConfigRepository: Repository<MlEngineConfig>,
     private readonly mlModelsService: MlModelsService,
-    private readonly mlReadinessService: MlReadinessService,
     private readonly mlGovernanceRulesService: MlGovernanceRulesService,
-    private readonly talentReadinessService: TalentReadinessService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -57,13 +53,12 @@ export class MlEngineConfigService implements OnApplicationBootstrap {
   }
 
   private async validateTalentEngine(updated: MlEngineConfig) {
-    const [activeModel, readiness] = await Promise.all([
-      this.mlModelsService.findActiveEntity(MlModelTask.TALENT),
-      this.talentReadinessService.evaluate(),
-    ])
+    const activeModel = await this.mlModelsService.findActiveEntity(
+      MlModelTask.TALENT,
+    )
     const reason = this.mlGovernanceRulesService.checkEngineChange(
       updated.talent_engine,
-      { hasActiveModel: !!activeModel, ready: readiness.ready },
+      { hasActiveModel: !!activeModel },
     )
     if (reason)
       throw new BadRequestException({
@@ -82,13 +77,10 @@ export class MlEngineConfigService implements OnApplicationBootstrap {
         mensaje: 'prob_medium_threshold debe ser menor que prob_high_threshold',
       })
     if (!engineChanged) return
-    const [activeModel, readiness] = await Promise.all([
-      this.mlModelsService.findActiveEntity(),
-      this.mlReadinessService.evaluate(),
-    ])
+    const activeModel = await this.mlModelsService.findActiveEntity()
     const reason = this.mlGovernanceRulesService.checkEngineChange(
       updated.engine,
-      { hasActiveModel: !!activeModel, ready: readiness.ready },
+      { hasActiveModel: !!activeModel },
     )
     if (reason)
       throw new BadRequestException({ status: 'Error', mensaje: reason })

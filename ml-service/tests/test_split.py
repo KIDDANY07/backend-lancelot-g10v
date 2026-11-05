@@ -4,8 +4,8 @@ import pytest
 from app.features import DATE, filter_training_rows, temporal_split
 
 
-def test_temporal_split_has_no_leakage(synthetic_dataset):
-    rows = filter_training_rows(synthetic_dataset)
+def test_temporal_split_has_no_leakage(daily_dataset):
+    rows = filter_training_rows(daily_dataset)
     train, test = temporal_split(rows)
 
     assert not train.empty and not test.empty
@@ -14,8 +14,8 @@ def test_temporal_split_has_no_leakage(synthetic_dataset):
     assert len(train) + len(test) == len(rows)
 
 
-def test_temporal_split_uses_the_last_20_percent_of_dates(synthetic_dataset):
-    rows = filter_training_rows(synthetic_dataset)
+def test_temporal_split_uses_the_last_20_percent_of_dates(daily_dataset):
+    rows = filter_training_rows(daily_dataset)
     train, test = temporal_split(rows, test_fraction=0.2)
     all_dates = sorted(rows[DATE].unique())
     test_dates = sorted(test[DATE].unique())

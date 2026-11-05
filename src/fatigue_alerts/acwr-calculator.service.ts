@@ -26,6 +26,7 @@ export interface AcwrResult {
 
 export const ACUTE_WINDOW_DAYS = 7
 export const CHRONIC_WINDOW_DAYS = 28
+export const MIN_CHRONIC_WEEKS_WITH_LOAD = 3
 
 @Injectable()
 export class AcwrCalculatorService {
@@ -84,6 +85,35 @@ export class AcwrCalculatorService {
     return Math.round((sum / inWindow.length) * 10) / 10
   }
 
+  countChronicWeeksWithLoad(
+    dailyLoadMap: Map<string, number>,
+    referenceDate: Date,
+  ): number {
+    const refDay = this.toDateOnlyUTC(referenceDate)
+    let weeks = 0
+    for (let week = 0; week < CHRONIC_WINDOW_DAYS / ACUTE_WINDOW_DAYS; week++) {
+      let load = 0
+      for (let day = 0; day < ACUTE_WINDOW_DAYS; day++) {
+        const key = this.dateKey(
+          this.addDays(refDay, -(week * ACUTE_WINDOW_DAYS + day)),
+        )
+        load += dailyLoadMap.get(key) ?? 0
+      }
+      if (load > 0) weeks++
+    }
+    return weeks
+  }
+
+  hasChronicBase(
+    dailyLoadMap: Map<string, number>,
+    referenceDate: Date,
+  ): boolean {
+    return (
+      this.countChronicWeeksWithLoad(dailyLoadMap, referenceDate) >=
+      MIN_CHRONIC_WEEKS_WITH_LOAD
+    )
+  }
+
   computeAcwr(acuteLoad: number, chronicLoad: number): number | null {
     if (chronicLoad === 0) return null
     return Math.round((acuteLoad / chronicLoad) * 100) / 100
@@ -116,7 +146,9 @@ export class AcwrCalculatorService {
       referenceDate,
       CHRONIC_WINDOW_DAYS,
     )
-    const acwr_value = this.computeAcwr(acute_load, chronic_load)
+    const acwr_value = this.hasChronicBase(dailyLoadMap, referenceDate)
+      ? this.computeAcwr(acute_load, chronic_load)
+      : null
     const rpe_avg = this.averageRpeInWindow(
       records,
       referenceDate,

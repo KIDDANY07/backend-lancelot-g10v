@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { cronsEnabled } from 'src/common/utils/cron.util'
 import { CLUB_TIMEZONE, todayKey } from 'src/common/utils/date.util'
 import { extractErrorMessage } from 'src/common/utils/error-message.util'
 import {
@@ -37,6 +38,7 @@ export class MlFeaturesCronService {
 
   @Cron(CronExpression.EVERY_DAY_AT_5AM, { timeZone: CLUB_TIMEZONE })
   async runDailyFeaturePipeline() {
+    if (!cronsEnabled()) return
     await this.runPipeline(todayKey())
   }
 

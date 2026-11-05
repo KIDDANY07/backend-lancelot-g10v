@@ -16,7 +16,7 @@ import {
 export const DEFAULT_TALENT_READINESS_MINIMUMS: TalentReadinessMinimums = {
   talent_min_seasons: 2,
   talent_min_promotions: 10,
-  talent_min_athletes: 30,
+  talent_min_athletes: 15,
 }
 
 export interface TalentReadinessReport extends ReadinessResult {

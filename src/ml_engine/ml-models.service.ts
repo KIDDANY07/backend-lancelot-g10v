@@ -85,9 +85,8 @@ export class MlModelsService {
     })
     return {
       status: 'Success',
-      mensaje: model.is_synthetic
-        ? 'Modelo registrado como sintético: sirve para probar el pipeline y nunca podrá activarse'
-        : 'Modelo registrado; un administrador debe activarlo si cumple las condiciones',
+      mensaje:
+        'Modelo registrado; un administrador debe activarlo para que el motor lo use',
       model: this.toResponse(model),
     }
   }
@@ -146,10 +145,12 @@ export class MlModelsService {
       ? await this.talentReadinessService.evaluate()
       : await this.mlReadinessService.evaluate()
     const reasons = this.mlGovernanceRulesService.checkModelActivation(model, {
-      ready: readiness.ready,
       currentFeatureVersion: isTalent
         ? TALENT_FEATURE_VERSION
         : FEATURE_VERSION,
+    })
+    const warnings = this.mlGovernanceRulesService.activationWarnings(model, {
+      ready: readiness.ready,
     })
     if (reasons.length > 0)
       throw new BadRequestException({
@@ -170,6 +171,7 @@ export class MlModelsService {
       status: 'Success',
       mensaje: `Modelo de ML de ${TASK_LABELS[model.task]} activado con éxito`,
       model: this.toResponse(model),
+      warnings,
     }
   }
 

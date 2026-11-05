@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -33,6 +34,11 @@ export enum InjuryRiskRuleCode {
   ML_PREDICTION = 'prediccion_ml',
 }
 
+@Index(
+  'UQ_injury_risk_assessments_user_date_method',
+  ['id_user', 'assessment_date', 'method'],
+  { unique: true },
+)
 @Entity('injury_risk_assessments')
 export class InjuryRiskAssessment {
   @PrimaryGeneratedColumn()

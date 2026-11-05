@@ -12,13 +12,10 @@ const MINIMUMS = {
 }
 
 const GOOD_MODEL: ModelActivationCandidate = {
-  is_synthetic: false,
   feature_version: 'v1',
   metrics: { pr_auc: 0.31, roc_auc: 0.72 },
   rules_baseline_metrics: { pr_auc: 0.18 },
 }
-
-const READY = { ready: true, currentFeatureVersion: 'v1' }
 
 describe('MlGovernanceRulesService', () => {
   let service: MlGovernanceRulesService
@@ -94,7 +91,6 @@ describe('MlGovernanceRulesService', () => {
       expect(
         service.checkEngineChange(MlEngineMode.RULES, {
           hasActiveModel: false,
-          ready: false,
         }),
       ).toBeNull()
     })
@@ -102,99 +98,67 @@ describe('MlGovernanceRulesService', () => {
     it('rejects shadow and ml without an active model', () => {
       for (const engine of [MlEngineMode.SHADOW, MlEngineMode.ML])
         expect(
-          service.checkEngineChange(engine, {
-            hasActiveModel: false,
-            ready: true,
-          }),
+          service.checkEngineChange(engine, { hasActiveModel: false }),
         ).toContain('no hay un modelo de ML activo')
     })
 
-    it('allows shadow with an active model even without readiness', () => {
-      expect(
-        service.checkEngineChange(MlEngineMode.SHADOW, {
-          hasActiveModel: true,
-          ready: false,
-        }),
-      ).toBeNull()
-    })
-
-    it('rejects ml without readiness and allows it with readiness', () => {
-      expect(
-        service.checkEngineChange(MlEngineMode.ML, {
-          hasActiveModel: true,
-          ready: false,
-        }),
-      ).toContain('readiness')
-      expect(
-        service.checkEngineChange(MlEngineMode.ML, {
-          hasActiveModel: true,
-          ready: true,
-        }),
-      ).toBeNull()
+    it('allows shadow and ml with an active model', () => {
+      for (const engine of [MlEngineMode.SHADOW, MlEngineMode.ML])
+        expect(
+          service.checkEngineChange(engine, { hasActiveModel: true }),
+        ).toBeNull()
     })
   })
 
   describe('checkModelActivation', () => {
-    it('allows a real model that beats the rules with readiness', () => {
-      expect(service.checkModelActivation(GOOD_MODEL, READY)).toEqual([])
-    })
-
-    it('never allows a synthetic model', () => {
-      const reasons = service.checkModelActivation(
-        { ...GOOD_MODEL, is_synthetic: true },
-        READY,
-      )
-      expect(reasons).toHaveLength(1)
-      expect(reasons[0]).toContain('sintéticos')
-    })
-
-    it('rejects activation without readiness', () => {
+    it('allows a model that uses the current feature version', () => {
       expect(
-        service.checkModelActivation(GOOD_MODEL, { ...READY, ready: false }),
-      ).toEqual([
-        'No se cumplen los mínimos de datos (readiness) para usar un modelo de ML',
-      ])
-    })
-
-    it('rejects a model that does not beat the rules on PR-AUC (ties included)', () => {
-      const reasons = service.checkModelActivation(
-        {
-          ...GOOD_MODEL,
-          metrics: { pr_auc: 0.18 },
-          rules_baseline_metrics: { pr_auc: 0.18 },
-        },
-        READY,
-      )
-      expect(reasons[0]).toContain('no supera a las reglas')
-    })
-
-    it('rejects a model without comparable PR-AUC metrics', () => {
-      const reasons = service.checkModelActivation(
-        { ...GOOD_MODEL, rules_baseline_metrics: null },
-        READY,
-      )
-      expect(reasons[0]).toContain('Faltan las métricas PR-AUC')
+        service.checkModelActivation(GOOD_MODEL, {
+          currentFeatureVersion: 'v1',
+        }),
+      ).toEqual([])
     })
 
     it('rejects a model trained with another feature version', () => {
       const reasons = service.checkModelActivation(
         { ...GOOD_MODEL, feature_version: 'v0' },
-        READY,
+        { currentFeatureVersion: 'v1' },
       )
       expect(reasons[0]).toContain('v0')
     })
+  })
 
-    it('accumulates every failing reason', () => {
-      const reasons = service.checkModelActivation(
-        {
-          is_synthetic: true,
-          feature_version: 'v0',
-          metrics: { pr_auc: 0.1 },
-          rules_baseline_metrics: { pr_auc: 0.2 },
-        },
-        { ready: false, currentFeatureVersion: 'v1' },
+  describe('activationWarnings', () => {
+    it('has no warnings for a model that beats the rules with readiness', () => {
+      expect(service.activationWarnings(GOOD_MODEL, { ready: true })).toEqual(
+        [],
       )
-      expect(reasons).toHaveLength(4)
+    })
+
+    it('warns without blocking when the readiness is not met', () => {
+      expect(
+        service.activationWarnings(GOOD_MODEL, { ready: false })[0],
+      ).toContain('readiness')
+    })
+
+    it('warns when the model does not beat the rules on PR-AUC (ties included)', () => {
+      const warnings = service.activationWarnings(
+        {
+          ...GOOD_MODEL,
+          metrics: { pr_auc: 0.18 },
+          rules_baseline_metrics: { pr_auc: 0.18 },
+        },
+        { ready: true },
+      )
+      expect(warnings[0]).toContain('no supera a las reglas')
+    })
+
+    it('warns when the PR-AUC metrics cannot be compared', () => {
+      const warnings = service.activationWarnings(
+        { ...GOOD_MODEL, rules_baseline_metrics: null },
+        { ready: true },
+      )
+      expect(warnings[0]).toContain('Faltan las métricas PR-AUC')
     })
   })
 

@@ -6,24 +6,12 @@ import pandas as pd
 FEATURE_VERSION = "v1"
 
 FEATURES: list[str] = [
-    "age_years",
-    "acute_load_7d",
-    "chronic_load_28d",
     "acwr",
     "acwr_ewma",
-    "monotony_7d",
-    "strain_7d",
-    "sessions_7d",
-    "rpe_avg_7d",
-    "match_minutes_7d",
-    "high_rpe_sessions_14d",
-    "prior_injuries_count",
-    "prior_non_contact_injuries_count",
-    "days_since_last_injury",
-    "is_recovering",
 ]
 
 LABEL = "label_injury_7d"
+GROUP = "id_user"
 DATE = "date"
 RULES_LEVEL = "rules_risk_level"
 

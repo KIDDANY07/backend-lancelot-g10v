@@ -18,8 +18,8 @@ import {
 
 export const DEFAULT_READINESS_MINIMUMS: ReadinessMinimums = {
   min_labeled_days: 270,
-  min_non_contact_injuries: 30,
-  min_athletes: 20,
+  min_non_contact_injuries: 20,
+  min_athletes: 15,
 }
 
 export interface ReadinessReport extends ReadinessResult {

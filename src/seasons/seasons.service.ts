@@ -52,6 +52,18 @@ export class SeasonsService {
     })
   }
 
+  async findForDate(dateKey: string) {
+    return this.seasonsRepository
+      .createQueryBuilder('season')
+      .where('season.start_date <= :dateKey', { dateKey })
+      .andWhere('(season.end_date IS NULL OR season.end_date >= :dateKey)', {
+        dateKey,
+      })
+      .orderBy('season.start_date', 'DESC')
+      .addOrderBy('season.id_season', 'DESC')
+      .getOne()
+  }
+
   async findPrevious(season: Season) {
     return this.seasonsRepository.findOne({
       where: { start_date: LessThan(season.start_date) },

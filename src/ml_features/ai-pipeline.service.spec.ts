@@ -6,6 +6,7 @@ import { InjuryRiskAssessment } from 'src/injury_risk_assessments/entities/injur
 import { InjuryRiskAssessmentsCronService } from 'src/injury_risk_assessments/injury-risk-assessments-cron.service'
 import { AiPipelineService } from './ai-pipeline.service'
 import { MlFeaturesCronService } from './ml-features-cron.service'
+import type { MlInferenceService } from 'src/ml_engine/ml-inference.service'
 
 jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
@@ -20,6 +21,10 @@ jest.mock(
 jest.mock('./ml-features-cron.service', () => ({
   MlFeaturesCronService: class {},
 }))
+jest.mock('src/ml_engine/ml-inference.service', () => ({
+  MlInferenceService: class {},
+}))
+jest.mock('./ml-features.service', () => ({ MAX_RANGE_DAYS: 730 }))
 
 const SUMMARY = { athletes: 3, created: 1, updated: 0, removed: 0, failed: 0 }
 
@@ -71,6 +76,7 @@ function buildService(pipelineDelay = 0) {
     fatigue as unknown as FatigueAlertsCronService,
     risk as unknown as InjuryRiskAssessmentsCronService,
     features as unknown as MlFeaturesCronService,
+    { runForDate: jest.fn() } as unknown as MlInferenceService,
   )
   return { service, order, fatigue, features }
 }

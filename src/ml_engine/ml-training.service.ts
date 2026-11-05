@@ -19,7 +19,6 @@ const TRAIN_PATHS: Record<MlModelTask, string> = {
 
 interface TrainedModelPayload {
   version: string
-  is_synthetic?: boolean
   metrics?: { pr_auc?: number | null }
   rules_baseline_metrics?: { pr_auc?: number | null } | null
 }
@@ -57,7 +56,7 @@ export class MlTrainingService {
       })
     try {
       return await this.mlServiceClient.request('POST', TRAIN_PATHS[task], {
-        body: { source: 'db' },
+        body: {},
         timeoutMs: ML_TRAINING_TIMEOUT_MS,
       })
     } catch (error) {
@@ -104,9 +103,7 @@ export class MlTrainingService {
     const comparison = `PR-AUC ${formatPrAuc(trained.metrics?.pr_auc)} frente a ${formatPrAuc(trained.rules_baseline_metrics?.pr_auc)} de las reglas`
     return {
       status: 'Success',
-      mensaje: trained.is_synthetic
-        ? `Modelo de ${TASK_LABELS[task]} ${trained.version} entrenado como sintético (no activable): ${comparison}`
-        : `Modelo de ${TASK_LABELS[task]} ${trained.version} entrenado y registrado: ${comparison}`,
+      mensaje: `Modelo de ${TASK_LABELS[task]} ${trained.version} entrenado y registrado: ${comparison}`,
       model,
     }
   }

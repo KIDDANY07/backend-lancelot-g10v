@@ -113,9 +113,28 @@ describe('AcwrCalculatorService', () => {
 
       expect(result.acute_load).toBe(100)
       expect(result.chronic_load).toBe(25)
-      expect(result.acwr_value).toBe(4)
+      expect(result.acwr_value).toBeNull()
       expect(result.rpe_avg).toBe(10)
-      expect(result.level).toBe(FatigueAlertLevel.ALTO)
+      expect(result.level).toBeNull()
+    })
+
+    it('does not compute acwr until three of the four chronic weeks have load', () => {
+      const twoWeeks: TrainingLoadRecord[] = [0, 3, 8, 10].map((daysBack) => ({
+        date: offsetDate(referenceDate, daysBack),
+        rpe: 5,
+        duration_min: 60,
+      }))
+      expect(
+        service.calculate(twoWeeks, referenceDate, THRESHOLDS).acwr_value,
+      ).toBeNull()
+
+      const threeWeeks = [
+        ...twoWeeks,
+        { date: offsetDate(referenceDate, 16), rpe: 5, duration_min: 60 },
+      ]
+      expect(
+        service.calculate(threeWeeks, referenceDate, THRESHOLDS).acwr_value,
+      ).not.toBeNull()
     })
 
     it('detects an abrupt load spike in the last 7 days against a steady chronic baseline', () => {

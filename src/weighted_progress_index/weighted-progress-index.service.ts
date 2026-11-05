@@ -191,11 +191,15 @@ export class WeightedProgressIndexService {
       where: { id_user, id_season },
       order: { eval_date: 'DESC', id_eval: 'DESC' },
     })
-    const latest = evaluations[0]
+    const latestVo2 = evaluations.find(
+      (evaluation) => evaluation.vo2max_estimado != null,
+    )
+    const latestSpeed = evaluations.find(
+      (evaluation) => evaluation.speed_20m != null,
+    )
     return {
-      vo2max:
-        latest?.vo2max_estimado != null ? Number(latest.vo2max_estimado) : null,
-      speed20m: latest?.speed_20m != null ? Number(latest.speed_20m) : null,
+      vo2max: latestVo2 ? Number(latestVo2.vo2max_estimado) : null,
+      speed20m: latestSpeed ? Number(latestSpeed.speed_20m) : null,
     }
   }
 

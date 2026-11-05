@@ -70,7 +70,6 @@ Ejecuta los comandos desde `backend/ml-service/`. Para Python, usa el ejecutable
 | Windows: .\.venv\Scripts\python.exe -m pip install -r requirements.txt; Mac/Linux: .venv/bin/python -m pip install -r requirements.txt | Instala las librerías. | Primera instalación o tras cambiar dependencias. |
 | Windows: .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000 --env-file .env; Mac/Linux: .venv/bin/python -m uvicorn app.main:app --reload --port 8000 --env-file .env | Inicia el servicio y lee .env. | Uso local. |
 | Windows: .\.venv\Scripts\python.exe -m pytest; Mac/Linux: .venv/bin/python -m pytest | Ejecuta las pruebas Python. | Revisar cambios. |
-| `python scripts/generate_synthetic.py --output data/synthetic_features.csv` | Crea datos ficticios de riesgo en un archivo CSV (datos organizados en filas y columnas). | Ensayar el flujo de entrenamiento. |
 | `docker build -t lancelot-ml .` | Construye la imagen Docker. | Ejecución opcional con contenedor. |
 | `docker run --name lancelot-ml --env-file .env -p 8000:8000 --volume lancelot-models:/app/models lancelot-ml` | Inicia el contenedor y conserva los archivos que genere el entrenamiento. | Si prefieres Docker al entorno local. |
 
@@ -98,14 +97,14 @@ FastAPI organiza la API y Uvicorn la ejecuta. `requirements.txt` declara librer�
 - `app/train.py`: ejecuta y evalúa el proceso de entrenamiento cuando el servidor lo solicita.
 - `app/predict.py` y `app/explain.py`: procesan solicitudes de estimación y preparan los factores que explican el resultado.
 - `app/db.py`: lectura de PostgreSQL; `app/backend_client.py`: consulta criterios de datos y comunica resultados con el servidor.
-- `app/config.py`: configuración; `scripts/generate_synthetic.py`: datos ficticios; `tests/`: pruebas.
+- `app/config.py`: configuración; `tests/`: pruebas y sus conjuntos de datos de ejemplo.
 
 ### Arquitectura de carpetas y archivos
 
 | Ruta | Función |
 |---|---|
 | requirements.txt | Declara las librerías de Python y sus versiones mínimas. |
-| Dockerfile | Construye la imagen desde Python 3.12, instala dependencias, copia app/ y scripts/, y arranca Uvicorn. |
+| Dockerfile | Construye la imagen desde Python 3.12, instala dependencias, copia app/ y arranca Uvicorn. |
 | .dockerignore | Excluye archivos locales que no deben entrar en la imagen. |
 | .env.example | Enumera variables necesarias, sin valores privados. |
 | app/main.py | Define rutas, valida x-api-key y coordina el flujo. |
@@ -114,7 +113,6 @@ FastAPI organiza la API y Uvicorn la ejecuta. `requirements.txt` declara librer�
 | app/db.py y app/backend_client.py | Lee conjuntos de PostgreSQL y consulta o actualiza información de integración en el backend. |
 | app/train.py | Entrena y evalúa cuando se solicita el proceso. |
 | app/predict.py y app/explain.py | Carga los artefactos requeridos por una solicitud y prepara resultados y factores. |
-| app/synthetic.py y scripts/generate_synthetic.py | Generan conjuntos sintéticos de prueba. |
 | tests/ | Pruebas de rutas, datos, entrenamiento y resultados. |
 
 ### Qué predice y qué datos usa
@@ -135,8 +133,8 @@ Un **endpoint** es una ruta que recibe solicitudes de otro programa. Todas las r
 | `GET /health` | Estado del servicio e indicadores de carga que expone el código. |
 | `POST /predict` | Estima riesgo de lesión sin contacto. |
 | `POST /talent/predict` | Estima potencial de ascenso. |
-| `POST /train` | Ejecuta el proceso de entrenamiento de riesgo con datos de la base o un CSV. |
-| `POST /talent/train` | Ejecuta el proceso de entrenamiento de talento con datos de la base o un CSV. |
+| `POST /train` | Entrena el modelo de riesgo con los datos de la base e informa la readiness. |
+| `POST /talent/train` | Entrena el modelo de talento con los datos de la base e informa la readiness. |
 | `DELETE /models/{version}` | Elimina los archivos locales asociados con esa versión cuando el servidor borra su registro. |
 
 FastAPI muestra la documentación de rutas en `/docs`. El servidor indica qué versión debe procesar una solicitud y recibe el resultado.
@@ -145,7 +143,7 @@ FastAPI muestra la documentación de rutas en `/docs`. El servidor indica qué v
 
 El servidor prepara conjuntos diarios para riesgo y conjuntos por temporada para talento. El servicio consulta PostgreSQL, separa los datos por fecha o temporada, procesa el entrenamiento y comunica el resultado al servidor. Este flujo depende de que existan datos suficientes y de que las métricas superen la referencia de las reglas.
 
-CSV es un archivo de datos organizado en filas y columnas. El código marca como sintético el resultado del proceso cuando usa un CSV y el servidor impide activarlo. Esos resultados no representan el rendimiento con deportistas reales. La cantidad y la calidad de los datos afectan las estimaciones. El código no establece un diagnóstico médico ni reemplaza al equipo de salud. Esta guía describe capacidades del código; no afirma que haya archivos generados o activos.
+El entrenamiento siempre lee la base de datos. La readiness se informa en la respuesta y no bloquea el entrenamiento. El modelo de riesgo compara una regresión logística regularizada con un árbol de poca profundidad, se calibra con método sigmoide y se valida por ventanas temporales y dejando un deportista fuera. La cantidad y la calidad de los datos afectan las estimaciones. El código no establece un diagnóstico médico ni reemplaza al equipo de salud. Esta guía describe capacidades del código; no afirma que haya archivos generados o activos.
 
 
 ### Construir y ejecutar con Docker

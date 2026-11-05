@@ -181,7 +181,12 @@ export class FeatureCalculatorService {
       acute_load_7d: acute_load,
       chronic_load_28d: chronic_load,
       acwr: acwr_value,
-      acwr_ewma: this.computeEwmaAcwr(dailyLoadMap, date),
+      acwr_ewma: this.acwrCalculatorService.hasChronicBase(
+        dailyLoadMap,
+        parseDateKey(date),
+      )
+        ? this.computeEwmaAcwr(dailyLoadMap, date)
+        : null,
       monotony_7d,
       strain_7d:
         monotony_7d === null ? null : this.round2(weeklyLoad * monotony_7d),

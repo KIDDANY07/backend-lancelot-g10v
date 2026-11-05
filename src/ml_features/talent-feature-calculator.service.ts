@@ -5,6 +5,7 @@ import {
   referenceYearOf,
   sportingAge,
 } from 'src/common/utils/sport-age.util'
+import { matchMinutesFor } from 'src/common/positions/position-catalog'
 import {
   TALENT_FEATURE_VERSION,
   TalentLabelQuality,
@@ -48,6 +49,19 @@ export interface TalentInjuryInput {
   severe: boolean
 }
 
+export interface TalentMinutesInput {
+  id_user: number
+  id_season: number
+  id_category: number
+  minutes: number
+}
+
+export interface TalentMatchCountInput {
+  id_season: number
+  id_category: number
+  matches: number
+}
+
 export interface TalentDatasetInput {
   seasons: TalentSeasonInput[]
   categories: TalentCategoryInput[]
@@ -55,7 +69,14 @@ export interface TalentDatasetInput {
   indices: TalentIndexInput[]
   injuries: TalentInjuryInput[]
   rulesFlagged: { id_user: number; id_season: number }[]
+  minutes: TalentMinutesInput[]
+  matchCounts: TalentMatchCountInput[]
   today: string
+}
+
+export interface TalentNextCategoryShare {
+  category: TalentCategoryInput
+  share: number
 }
 
 export interface TalentFeatureRow {
@@ -87,6 +108,8 @@ export interface TalentFeatureRow {
 }
 
 const NEUTRAL_PERCENTILE = 50
+export const CONSOLIDATION_MINUTES_SHARE = 0.5
+export const PROMOTION_MINUTES_SHARE = 0.3
 
 function round2(value: number) {
   return Math.round(value * 100) / 100
@@ -127,7 +150,7 @@ export class TalentFeatureCalculatorService {
     birthDate: string | null
     nextSeason: TalentSeasonInput | null
     nextSeasonHasAssignments: boolean
-    nextCategories: TalentCategoryInput[]
+    nextShares: TalentNextCategoryShare[]
     categories: TalentCategoryInput[]
   }): { quality: TalentLabelQuality; promoted: boolean | null } {
     if (!input.nextSeason || !input.nextSeasonHasAssignments)
@@ -136,13 +159,22 @@ export class TalentFeatureCalculatorService {
       input.birthDate,
       referenceYearOf(input.nextSeason.start_date),
     )
-    if (input.nextCategories.length === 0 || age === null)
+    if (input.nextShares.length === 0 || age === null)
       return { quality: TalentLabelQuality.EXCLUDED, promoted: null }
+    const base = [...input.nextShares].sort(
+      (a, b) =>
+        a.category.max_age - b.category.max_age ||
+        a.category.min_age - b.category.min_age,
+    )[0]
+    const consolidated = base.share >= CONSOLIDATION_MINUTES_SHARE
+    const promoted = input.nextShares.some(
+      (item) =>
+        this.isAboveNatural(item.category, age, input.categories) &&
+        item.share >= PROMOTION_MINUTES_SHARE,
+    )
     return {
       quality: TalentLabelQuality.LABELED,
-      promoted: input.nextCategories.some((category) =>
-        this.isAboveNatural(category, age, input.categories),
-      ),
+      promoted: consolidated || promoted,
     }
   }
 
@@ -159,6 +191,30 @@ export class TalentFeatureCalculatorService {
         index,
       ]),
     )
+    const minutesByKey = new Map<string, number>()
+    for (const item of input.minutes) {
+      const key = `${item.id_user}:${item.id_season}:${item.id_category}`
+      minutesByKey.set(key, (minutesByKey.get(key) ?? 0) + item.minutes)
+    }
+    const matchesByKey = new Map(
+      input.matchCounts.map((item) => [
+        `${item.id_season}:${item.id_category}`,
+        item.matches,
+      ]),
+    )
+    const shareOf = (
+      item: TalentAssignmentInput,
+      category: TalentCategoryInput,
+    ) => {
+      const matches =
+        matchesByKey.get(`${item.id_season}:${category.id_category}`) ?? 0
+      if (matches <= 0) return 0
+      const minutes =
+        minutesByKey.get(
+          `${item.id_user}:${item.id_season}:${category.id_category}`,
+        ) ?? 0
+      return minutes / (matches * matchMinutesFor(item.position))
+    }
     const flagged = new Set(
       input.rulesFlagged.map((flag) => `${flag.id_user}:${flag.id_season}`),
     )
@@ -226,11 +282,13 @@ export class TalentFeatureCalculatorService {
           birthDate: assignment.birth_date,
           nextSeason,
           nextSeasonHasAssignments: nextAssignments.length > 0,
-          nextCategories: nextAssignments
+          nextShares: nextAssignments
             .filter((item) => item.id_user === assignment.id_user)
             .flatMap((item) => {
               const next = categoryById.get(item.id_category)
-              return next ? [next] : []
+              return next
+                ? [{ category: next, share: shareOf(item, next) }]
+                : []
             }),
           categories: input.categories,
         })
