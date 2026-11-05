@@ -84,10 +84,12 @@ export class ReportsController {
   })
   @ApiParam({ name: 'id_user', type: Number })
   @ApiParam({ name: 'id_season', type: Number })
+  @ApiQuery({ type: PageQueryDto })
   seasonSummary(
     @Param('id_user', ParseIntPipe) id_user: number,
     @Param('id_season', ParseIntPipe) id_season: number,
+    @Query() pagination: PageQueryDto,
   ) {
-    return this.reportsService.getSeasonSummary(id_user, id_season)
+    return this.reportsService.getSeasonSummary(id_user, id_season, pagination)
   }
 }

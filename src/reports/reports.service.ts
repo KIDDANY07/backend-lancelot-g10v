@@ -72,7 +72,11 @@ export class ReportsService {
     private readonly seasonsService: SeasonsService,
   ) {}
 
-  async getSeasonSummary(id_user: number, id_season: number) {
+  async getSeasonSummary(
+    id_user: number,
+    id_season: number,
+    paginationQuery: PageQueryDto = {},
+  ) {
     const athlete = await this.usersService.findOneById(id_user)
     if (!athlete)
       throw new NotFoundException({
@@ -151,15 +155,43 @@ export class ReportsService {
       .orderBy('alert.date', 'ASC')
       .getMany()
 
-    const injuryRiskAssessments = await this.injuryRiskAssessmentsRepository
+    const injuryRiskQuery = this.injuryRiskAssessmentsRepository
       .createQueryBuilder('assessment')
       .where('assessment.id_user = :id_user', { id_user })
       .andWhere('assessment.assessment_date BETWEEN :start AND :end', {
         start: seasonStart,
         end: seasonEnd,
       })
-      .orderBy('assessment.assessment_date', 'ASC')
-      .getMany()
+    const injuryRiskAssessmentsPagination = paginationQuery.page
+      ? {
+          page: paginationQuery.page,
+          limit: paginationQuery.limit ?? 10,
+        }
+      : undefined
+    if (injuryRiskAssessmentsPagination) {
+      injuryRiskQuery
+        .andWhere('assessment.status = :status', { status: 'open' })
+        .orderBy('assessment.assessment_date', 'DESC')
+        .addOrderBy('assessment.id_assessment', 'DESC')
+        .skip(
+          (injuryRiskAssessmentsPagination.page - 1) *
+            injuryRiskAssessmentsPagination.limit,
+        )
+        .take(injuryRiskAssessmentsPagination.limit)
+    } else {
+      injuryRiskQuery
+        .orderBy('assessment.assessment_date', 'ASC')
+        .addOrderBy('assessment.id_assessment', 'ASC')
+    }
+    let injuryRiskAssessments: InjuryRiskAssessment[]
+    let injuryRiskAssessmentsTotal = 0
+    if (injuryRiskAssessmentsPagination) {
+      const [assessments, total] = await injuryRiskQuery.getManyAndCount()
+      injuryRiskAssessments = assessments
+      injuryRiskAssessmentsTotal = total
+    } else {
+      injuryRiskAssessments = await injuryRiskQuery.getMany()
+    }
 
     let trainingParticipation = {
       total_sessions: 0,
@@ -292,6 +324,16 @@ export class ReportsService {
           injuryRiskAssessments,
           { excludeExtraneousValues: true },
         ),
+        ...(injuryRiskAssessmentsPagination && {
+          injury_risk_assessments_pagination: {
+            ...injuryRiskAssessmentsPagination,
+            total: injuryRiskAssessmentsTotal,
+            totalPages: Math.ceil(
+              injuryRiskAssessmentsTotal /
+                injuryRiskAssessmentsPagination.limit,
+            ),
+          },
+        }),
         talent_flags: plainToInstance(ResponseTalentFlagDto, talentFlags, {
           excludeExtraneousValues: true,
         }),
