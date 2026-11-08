@@ -34,6 +34,7 @@ import { MlFeaturesModule } from './ml_features/ml-features.module'
 import { MlEngineModule } from './ml_engine/ml-engine.module'
 import { AlertInboxModule } from './alert_inbox/alert-inbox.module'
 import { SeasonPlanningModule } from './season_planning/season-planning.module'
+import { DashboardModule } from './dashboard/dashboard.module'
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { SeasonPlanningModule } from './season_planning/season-planning.module'
     MlEngineModule,
     AlertInboxModule,
     SeasonPlanningModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],

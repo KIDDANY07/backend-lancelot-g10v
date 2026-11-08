@@ -172,6 +172,7 @@ Un **endpoint** es una ruta de la API que recibe una acción, como consultar una
 | `/api/progress-index`, `/api/progress-index/ranking` | `ADMIN`, `DIRECTOR_TECNICO`, `ENTRENADOR`; recalcular temporada requiere `ADMIN` o `DIRECTOR_TECNICO`. |
 | `/api/talent-flags`, `/api/season-planning/:id_season` | Según acción: `ADMIN`, `DIRECTOR_TECNICO`, `ENTRENADOR`; aplicar un plan requiere `ADMIN` o `DIRECTOR_TECNICO`. |
 | `/api/ml/readiness`, `/api/ml/models` | Acceso administrativo y de salud, más llamadas internas del servicio de aprendizaje automático con `x-api-key`. |
+| `/api/dashboard/*` | `GET`, solo lectura; los roles cambian por sección (ver «Módulo de tablero»). |
 
 Los roles usados son `ADMIN`, `ENTRENADOR`, `DEPORTISTA`, `DIRECTOR_TECNICO` y `ENCARGADO_SALUD`. El servicio de aprendizaje automático también usa la credencial interna `ML_SERVICE`. La lista completa de rutas, métodos y roles está en `/api/docs` del servidor local.
 
@@ -184,6 +185,20 @@ Los roles usados son `ADMIN`, `ENTRENADOR`, `DEPORTISTA`, `DIRECTOR_TECNICO` y `
 - El índice ponderado combina puntajes físicos, técnicos, tácticos y de participación. Ejemplo ficticio: `80×0,30 + 70×0,30 + 60×0,20 + 90×0,20 = 75`. Estos pesos son solo un ejemplo; el sistema busca el perfil real por posición y categoría.
 
 Código relacionado: `src/fatigue_alerts/acwr-calculator.service.ts`, `src/fatigue_alerts/fatigue-alerts-cron.service.ts`, `src/injury_risk_assessments/injury-risk-rules.service.ts`, `src/weighted_progress_index/progress-index-calculator.service.ts`, `src/main.ts` y `src/app.module.ts`.
+
+### Módulo de tablero
+
+`src/dashboard/` reúne los indicadores del tablero en rutas `GET` de solo lectura bajo `/api/dashboard`, filtradas por `id_season` e `id_category`.
+
+| Rutas | Qué devuelve | Roles |
+|---|---|---|
+| `overview`, `load`, `training`, `matches` | Resumen, carga y ACWR, sesiones y RPE, partidos y estadísticas | Los cinco; `DEPORTISTA` solo sus datos |
+| `by-category`, `by-season`, `injury-risk` | Indicadores por categoría y por temporada; deportistas que requieren atención | `ADMIN`, `DIRECTOR_TECNICO`, `ENTRENADOR`, `ENCARGADO_SALUD` |
+| `health` | Lesiones, alertas por semana; registros de salud y consentimientos solo para `ADMIN` y `ENCARGADO_SALUD` | `ADMIN`, `ENTRENADOR`, `ENCARGADO_SALUD` |
+| `development` | Evaluaciones, índice de progreso, talento y objetivos | `ADMIN`, `DIRECTOR_TECNICO`, `ENTRENADOR`, `DEPORTISTA` (sin talento) |
+| `ml` | Motor, modelos frente a reglas, predicciones, readiness | `ADMIN`, `DIRECTOR_TECNICO`, `ENCARGADO_SALUD` |
+
+Las agregaciones se hacen en SQL. Un promedio o porcentaje sin datos se devuelve en `null`, nunca como 0. Más detalle: `docs/MODULO_DASHBOARD.md` en la carpeta del espacio de trabajo.
 
 ### Pruebas y datos de demostración
 

@@ -37,6 +37,7 @@ async function bootstrap() {
     .addTag('ML - Variables diarias')
     .addTag('ML - Motor y readiness')
     .addTag('ML - Registro de modelos')
+    .addTag('Tablero')
     .addBearerAuth(
       {
         type: 'http',
