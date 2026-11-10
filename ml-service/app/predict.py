@@ -1,3 +1,4 @@
+import logging
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -10,6 +11,9 @@ from app import backend_client
 from app.config import get_settings
 from app.explain import build_tree_explainer, top_factors
 from app.features import FEATURE_VERSION, prepare_matrix
+from app.runtime import version_differences
+
+logger = logging.getLogger("lancelot-ml")
 
 
 class ModelNotAvailable(Exception):
@@ -22,7 +26,7 @@ class ModelStore:
         models_dir: Callable[[], Path] = lambda: get_settings().models_dir,
         active_version: Callable[[], str | None] = backend_client.get_active_model_version,
         feature_version: str = FEATURE_VERSION,
-        prepare: Callable[[pd.DataFrame], pd.DataFrame] = prepare_matrix,
+        prepare: Callable[..., pd.DataFrame] = prepare_matrix,
         label: str = "de riesgo de lesión",
     ) -> None:
         self._models_dir = models_dir
@@ -50,6 +54,18 @@ class ModelStore:
                 f"El modelo {version} usa variables {bundle.get('feature_version')} "
                 f"y el servicio espera {self._feature_version}"
             )
+        differences = version_differences(bundle.get("library_versions"))
+        if differences:
+            detail = ", ".join(
+                f"{name} {saved} → {current}" for name, (saved, current) in differences.items()
+            )
+            logger.warning(
+                "El modelo %s se entrenó con otras versiones de librerías (%s); reentrénelo si sus predicciones cambian",
+                version,
+                detail,
+            )
+        elif "library_versions" not in bundle:
+            logger.info("El modelo %s no registra las versiones de librerías con que se entrenó", version)
         explainer = build_tree_explainer(bundle) if bundle["kind"] == "tree" else None
         self._bundle = bundle
         self._explainer = explainer
@@ -77,7 +93,7 @@ class ModelStore:
         bundle = self._bundle
         if bundle is None:
             raise ModelNotAvailable("No hay un modelo de ML cargado")
-        row = self._prepare(pd.DataFrame([features]))
+        row = self._prepare(pd.DataFrame([features]), bundle.get("features"))
         probability = float(bundle["model"].predict_proba(row)[0, 1])
         return {
             "probability": round(probability, 4),

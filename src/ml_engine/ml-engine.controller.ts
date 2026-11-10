@@ -45,7 +45,7 @@ export class MlEngineController {
   @Put('engine-config')
   @ApiOperation({
     summary:
-      'Cambiar el modo del motor o sus umbrales. shadow requiere un modelo activo; ml requiere además la readiness. Los umbrales de probabilidad deben calibrarse con los datos del club',
+      'Cambiar el modo de los motores de riesgo y de talento (rules, shadow o ml) o sus umbrales. shadow y ml requieren un modelo activo de la tarea; la readiness es informativa y no bloquea el cambio. Los umbrales de probabilidad deben calibrarse con los datos del club',
   })
   @ApiOkResponse({ type: ResponseMlEngineConfigDto })
   updateEngineConfig(@Body() updateMlEngineConfigDto: UpdateMlEngineConfigDto) {

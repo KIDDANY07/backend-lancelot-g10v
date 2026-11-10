@@ -177,3 +177,16 @@ def test_delete_model_without_file_is_not_an_error(client):
 def test_delete_model_rejects_unsafe_versions_and_requires_the_api_key(client):
     assert client.delete("/models/..joblib", headers=HEADERS).status_code in (400, 422)
     assert client.delete("/models/rf-1").status_code == 401
+
+
+def test_service_starts_even_if_the_active_model_cannot_be_loaded(monkeypatch, tmp_path):
+    monkeypatch.setenv("ML_SERVICE_API_KEY", API_KEY)
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    (tmp_path / "lr-roto.joblib").write_bytes(b"no es un modelo")
+    broken = ModelStore(models_dir=lambda: tmp_path, active_version=lambda: "lr-roto")
+    monkeypatch.setattr(main, "store", broken)
+    monkeypatch.setattr(
+        main, "talent_store", ModelStore(models_dir=lambda: tmp_path, active_version=lambda: None)
+    )
+    with TestClient(main.app) as test_client:
+        assert test_client.get("/health").json()["model_loaded"] is False

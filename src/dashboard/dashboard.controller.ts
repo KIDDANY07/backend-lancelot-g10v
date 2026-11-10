@@ -6,6 +6,7 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-guard'
 import { RolesGuard } from 'src/auth/guard/roles.guard'
 import { User } from 'src/users/entities/user.entity'
 import { DashboardInsightsService } from './dashboard-insights.service'
+import { DashboardSummaryService } from './dashboard-summary.service'
 import { DashboardService } from './dashboard.service'
 import { DashboardQueryDto } from './dto/dashboard-query.dto'
 
@@ -27,6 +28,7 @@ export const DASHBOARD_ROLES = {
   health: ['ADMIN', 'ENTRENADOR', 'ENCARGADO_SALUD'],
   development: ['ADMIN', 'DIRECTOR_TECNICO', 'ENTRENADOR', 'DEPORTISTA'],
   ml: ['ADMIN', 'DIRECTOR_TECNICO', 'ENCARGADO_SALUD'],
+  summary: [...STAFF],
 } as const
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,6 +39,7 @@ export class DashboardController {
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly insights: DashboardInsightsService,
+    private readonly summaryService: DashboardSummaryService,
   ) {}
 
   @Get('overview')
@@ -137,5 +140,15 @@ export class DashboardController {
   })
   ml(@Query() query: DashboardQueryDto, @GetUser() user: User) {
     return this.insights.getMl(query, user)
+  }
+
+  @Get('summary')
+  @Roles(...DASHBOARD_ROLES.summary)
+  @ApiOperation({
+    summary:
+      'Resumen general del club: todo lo registrado (deportistas, sesiones, cargas de RPE, partidos, lesiones, alertas y evaluaciones de riesgo), las reglas vigentes, el índice de progreso, las señalizaciones de talento y los modelos de ML frente a las reglas. Sin filtros cubre todo el historial; con temporada o categoría se limita a ellas. Los usuarios por rol solo para ADMIN; el desarrollo, para quienes ven desarrollo y talento; los modelos, para quienes ven el ML',
+  })
+  summary(@Query() query: DashboardQueryDto, @GetUser() user: User) {
+    return this.summaryService.getSummary(query, user)
   }
 }

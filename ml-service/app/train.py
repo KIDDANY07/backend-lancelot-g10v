@@ -32,6 +32,7 @@ from app.features import (
     rules_scores,
     temporal_split,
 )
+from app.runtime import library_versions
 from app.talent_features import (
     SEASON,
     TALENT_FEATURE_VERSION,
@@ -311,6 +312,7 @@ def train_model(
         "algorithm": best.name,
         "features": FEATURES,
         "feature_version": FEATURE_VERSION,
+        "library_versions": library_versions(),
     }
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / f"{version}.joblib"
@@ -415,6 +417,7 @@ def train_talent_model(
         "algorithm": best.name,
         "features": TALENT_FEATURES,
         "feature_version": TALENT_FEATURE_VERSION,
+        "library_versions": library_versions(),
     }
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / f"{version}.joblib"

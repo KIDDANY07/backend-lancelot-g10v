@@ -8,6 +8,9 @@ jest.mock('./dashboard.service', () => ({ DashboardService: class {} }))
 jest.mock('./dashboard-insights.service', () => ({
   DashboardInsightsService: class {},
 }))
+jest.mock('./dashboard-summary.service', () => ({
+  DashboardSummaryService: class {},
+}))
 
 type Handler = keyof DashboardController
 
@@ -20,6 +23,7 @@ const ALL: Handler[] = [
   'injuryRisk',
   'training',
   'matches',
+  'summary',
 ]
 
 function contextFor(handler: Handler, role: string): ExecutionContext {
@@ -64,6 +68,7 @@ describe('DashboardController roles', () => {
       'injuryRisk',
       'health',
       'ml',
+      'summary',
     ] as Handler[])
       expect(allowed(handler, 'DEPORTISTA')).toBe(false)
   })

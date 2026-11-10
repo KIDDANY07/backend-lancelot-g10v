@@ -24,16 +24,17 @@ SEASON = "season_start"
 RULES_FLAGGED = "rules_flagged"
 
 
-def prepare_talent_matrix(df: pd.DataFrame) -> pd.DataFrame:
+def prepare_talent_matrix(df: pd.DataFrame, features: list[str] | None = None) -> pd.DataFrame:
+    columns = list(features) if features else TALENT_FEATURES
     matrix = pd.DataFrame(index=df.index)
-    for feature in TALENT_FEATURES:
+    for feature in columns:
         if feature not in df.columns:
             matrix[feature] = np.nan
         elif feature in BOOLEAN_FEATURES:
             matrix[feature] = df[feature].map(_to_bool).astype(float)
         else:
             matrix[feature] = pd.to_numeric(df[feature], errors="coerce")
-    return matrix[TALENT_FEATURES].astype(float)
+    return matrix[columns].astype(float)
 
 
 def filter_talent_training_rows(df: pd.DataFrame) -> pd.DataFrame:

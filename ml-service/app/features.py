@@ -32,16 +32,20 @@ def _to_bool(value):
     return np.nan
 
 
-def prepare_matrix(df: pd.DataFrame) -> pd.DataFrame:
+BOOLEAN_FEATURES = {"is_recovering"}
+
+
+def prepare_matrix(df: pd.DataFrame, features: list[str] | None = None) -> pd.DataFrame:
+    columns = list(features) if features else FEATURES
     matrix = pd.DataFrame(index=df.index)
-    for feature in FEATURES:
+    for feature in columns:
         if feature not in df.columns:
             matrix[feature] = np.nan
-        elif feature == "is_recovering":
+        elif feature in BOOLEAN_FEATURES:
             matrix[feature] = df[feature].map(_to_bool).astype(float)
         else:
             matrix[feature] = pd.to_numeric(df[feature], errors="coerce")
-    return matrix[FEATURES].astype(float)
+    return matrix[columns].astype(float)
 
 
 def filter_training_rows(df: pd.DataFrame) -> pd.DataFrame:

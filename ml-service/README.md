@@ -34,7 +34,7 @@ Comprueba las instalaciones en PowerShell (Windows) o Terminal (Mac/Linux):
 
 1. Abre PowerShell o Terminal en la raíz del espacio de trabajo y entra a esta carpeta con `cd backend/ml-service`. Debes quedar dentro de `backend/ml-service/`.
 2. Crea un entorno aislado de Python. En Windows ejecuta **py -3.12 -m venv .venv**; en Mac/Linux ejecuta **python3 -m venv .venv**. Al terminar aparecerá la carpeta `.venv`.
-3. Instala las librerías desde `backend/ml-service/`. En Windows usa **.\.venv\Scripts\python.exe -m pip install -r requirements.txt**; en Mac/Linux usa **.venv/bin/python -m pip install -r requirements.txt**. Espera a que pip termine sin errores.
+3. Instala las librerías desde `backend/ml-service/`. En Windows usa **.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt**; en Mac/Linux usa **.venv/bin/python -m pip install -r requirements-dev.txt**. Espera a que pip termine sin errores. `requirements-dev.txt` incluye las librerías de producción (`requirements.txt`) más pytest.
 4. Si no existe `.env`, copia la plantilla. En PowerShell: `Copy-Item .env.example .env`. En Mac/Linux: `cp .env.example .env`. No reemplaces un archivo existente.
 5. Abre `.env` en un editor de texto y completa la tabla siguiente. Usa datos ficticios en tu computador. La clave compartida debe coincidir con `ML_SERVICE_API_KEY` en `backend/.env`.
 6. Deja PostgreSQL y el servidor encendidos si vas a procesar solicitudes que consultan datos. Inicia el servicio con los comandos de Inicio rápido.
@@ -67,7 +67,7 @@ Ejecuta los comandos desde `backend/ml-service/`. Para Python, usa el ejecutable
 | Comando | Para qué sirve | Cuándo usarlo |
 |---|---|---|
 | Windows: py -3.12 -m venv .venv; Mac/Linux: python3 -m venv .venv | Crea el entorno aislado. | Primera instalación. |
-| Windows: .\.venv\Scripts\python.exe -m pip install -r requirements.txt; Mac/Linux: .venv/bin/python -m pip install -r requirements.txt | Instala las librerías. | Primera instalación o tras cambiar dependencias. |
+| Windows: .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt; Mac/Linux: .venv/bin/python -m pip install -r requirements-dev.txt | Instala las librerías de producción y de pruebas. | Primera instalación o tras cambiar dependencias. |
 | Windows: .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000 --env-file .env; Mac/Linux: .venv/bin/python -m uvicorn app.main:app --reload --port 8000 --env-file .env | Inicia el servicio y lee .env. | Uso local. |
 | Windows: .\.venv\Scripts\python.exe -m pytest; Mac/Linux: .venv/bin/python -m pytest | Ejecuta las pruebas Python. | Revisar cambios. |
 | `docker build -t lancelot-ml .` | Construye la imagen Docker. | Ejecución opcional con contenedor. |
@@ -90,7 +90,9 @@ El proyecto incluye un `Dockerfile`, pero no un archivo `docker-compose`. Si eje
 
 ### Estructura y versiones
 
-FastAPI organiza la API y Uvicorn la ejecuta. `requirements.txt` declara librerías con versiones mínimas, no exactas: FastAPI >=0.115, Uvicorn >=0.30, pandas >=2.2, NumPy >=2.0, scikit-learn >=1.5, SQLAlchemy >=2.0, psycopg >=3.2, joblib >=1.4 y SHAP >=0.46. pytest y httpx se usan en pruebas. No hay package.json ni pyproject.toml.
+FastAPI organiza la API y Uvicorn la ejecuta. `requirements.in` declara las librerías directas y `requirements.txt` fija **todas** las versiones exactas (scikit-learn 1.9.1, NumPy 2.5.4, pandas 3.1.1, joblib 1.6.0, SHAP 0.54.1, FastAPI 0.162.0, entre otras), resueltas para Python 3.12. Las versiones son fijas porque los modelos se guardan con joblib: si un despliegue instalara otra versión de scikit-learn, los modelos guardados en el volumen podrían dejar de cargar o cambiar sus predicciones. `requirements-dev.txt` agrega pytest para las pruebas; la imagen de producción no lo instala.
+
+Para actualizar una librería, cambia `requirements.in`, regenera el bloqueo con el comando que aparece al inicio de `requirements.txt`, ejecuta las pruebas y **reentrena** los modelos después del despliegue. Cada modelo guarda las versiones con que se entrenó; si al cargarlo no coinciden, el servicio lo advierte en el log.
 
 - app/main.py: rutas HTTP, clave y coordinación de entrenamiento y predicción.
 - app/features.py y app/talent_features.py: variables permitidas y preparación de conjuntos.
@@ -103,7 +105,9 @@ FastAPI organiza la API y Uvicorn la ejecuta. `requirements.txt` declara librer�
 
 | Ruta | Función |
 |---|---|
-| requirements.txt | Declara las librerías de Python y sus versiones mínimas. |
+| requirements.in | Librerías directas del servicio. |
+| requirements.txt | Bloqueo con las versiones exactas que instala la imagen de producción. |
+| requirements-dev.txt | Producción más pytest, para desarrollo y CI. |
 | Dockerfile | Construye la imagen desde Python 3.12, instala dependencias, copia app/ y arranca Uvicorn. |
 | .dockerignore | Excluye archivos locales que no deben entrar en la imagen. |
 | .env.example | Enumera variables necesarias, sin valores privados. |
@@ -172,4 +176,22 @@ flowchart LR
   ml --> db
 ```
 
-El `Dockerfile` también configura internamente `PYTHONDONTWRITEBYTECODE` y `PYTHONUNBUFFERED`; no hace falta agregarlas a `.env`. El equipo indica que el servidor se despliega en Railway. El repositorio no confirma que este servicio se despliegue allí ni cómo conserva los archivos que genera.
+El `Dockerfile` también configura internamente `PYTHONDONTWRITEBYTECODE` y `PYTHONUNBUFFERED`; no hace falta agregarlas a `.env`.
+
+## Despliegue en Railway
+
+El servicio corre en Railway como `lancelot-ml`, en el proyecto LANCELOT, desde este mismo repositorio. Su configuración está en código en `.railway/railway.ts` (raíz del repositorio) y la CI en `.github/workflows/ml-service.yml`.
+
+| Pieza | Qué evita |
+|---|---|
+| Directorio raíz `/ml-service` y Dockerfile `/ml-service/Dockerfile` | El error «failed to read Dockerfile» que hacía fallar los despliegues. |
+| Despliegue solo con cambios en `ml-service/**` | Que cada push del backend reconstruya y reinicie el ML sin necesidad. |
+| Espera a la CI de GitHub | Que llegue a producción código con pruebas rotas o una imagen que no construye. |
+| Health check en `/health` (120 s) | Que una versión que no arranca reemplace a la que funciona: Railway mantiene la anterior. |
+| Volumen `lancelot-ml-volume` en `/app/models` (obligatorio) y `RAILWAY_RUN_UID=0` | Perder los modelos entrenados en cada despliegue; la variable permite escribir en el volumen. |
+| Versiones fijadas y versiones guardadas en cada modelo | Que un despliegue cambie scikit-learn y rompa los modelos guardados. |
+| Predicción con las variables de cada modelo | Que cambiar la lista de variables en el código rompa los modelos ya entrenados. |
+
+Variables del servicio en Railway: `DATABASE_URL`, `BACKEND_URL` (red privada del backend), `ML_SERVICE_API_KEY` (la misma que en el backend), `MODELS_DIR=/app/models`, `BACKEND_TIMEOUT_SECONDS`, `PORT=8000` y `RAILWAY_RUN_UID=0`. En el backend, `ML_SERVICE_URL` debe apuntar a la red privada del ML con el mismo puerto.
+
+Antes de hacer push con cambios en el ML: `python -m pytest -q` y, si cambiaste el Dockerfile o las dependencias, `docker build -t lancelot-ml ml-service`. Tras un despliegue que cambie librerías, entrena de nuevo los modelos desde «Análisis IA» y actívalos.

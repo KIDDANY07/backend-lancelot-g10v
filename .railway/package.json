@@ -1,0 +1,8 @@
+{
+  "name": "lancelot-railway-iac",
+  "private": true,
+  "description": "Infraestructura como código de Railway para el servicio de aprendizaje automático",
+  "devDependencies": {
+    "railway": "3.16.0"
+  }
+}

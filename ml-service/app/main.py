@@ -15,9 +15,11 @@ from app.backend_client import BackendError
 from app.config import get_settings
 from app.db import load_dataset_from_db, load_talent_dataset_from_db
 from app.predict import ModelNotAvailable, ModelStore
+from app.runtime import library_versions
 from app.talent_features import TALENT_FEATURE_VERSION, prepare_talent_matrix
 from app.train import TrainingError, TrainingResult, train_model, train_talent_model
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s - %(message)s")
 logger = logging.getLogger("lancelot-ml")
 
 store = ModelStore()
@@ -31,12 +33,24 @@ talent_store = ModelStore(
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings = get_settings()
+    logger.info("Versiones de librerías: %s", library_versions())
+    logger.info(
+        "Directorio de modelos %s: %s archivos .joblib",
+        settings.models_dir,
+        len(list(settings.models_dir.glob("*.joblib"))) if settings.models_dir.is_dir() else "no existe",
+    )
     for name, model_store in (("riesgo de lesión", store), ("talento", talent_store)):
         try:
             model_store.refresh()
             logger.info("Modelo activo de %s cargado: %s", name, model_store.version)
         except (ModelNotAvailable, BackendError) as error:
             logger.warning("El servicio inicia sin modelo de %s: %s", name, error)
+        except Exception:
+            logger.exception(
+                "No se pudo cargar el modelo activo de %s; el servicio inicia sin él y las predicciones responderán 503",
+                name,
+            )
     yield
 
 
